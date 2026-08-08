@@ -2,6 +2,13 @@ packages:
   - "apps/*"
   - "packages/*"
 
+# NOTE: `injectWorkspacePackages: true` was tried here to make `pnpm deploy`
+# emit a self-contained tree for the Dockerfiles. It BREAKS local development —
+# injected packages are copied at install time rather than symlinked, so edits
+# to packages/* stop propagating and apps/worker fails to resolve
+# @pricetrail/queue until a full reinstall. Do not re-add it without solving
+# that; see docs for the Docker packaging status.
+
 # pnpm blocks dependency postinstall scripts by default (supply-chain
 # hardening). Each entry below is an explicit trust decision.
 allowBuilds:

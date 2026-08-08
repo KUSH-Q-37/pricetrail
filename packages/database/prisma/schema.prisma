@@ -29,6 +29,19 @@
 
 generator client {
   provider = "prisma-client-js"
+
+  // Generate INSIDE the package, not into node_modules.
+  //
+  // By default `prisma generate` writes to node_modules/.prisma — a location
+  // that belongs to no package. `pnpm deploy` (used by the Dockerfiles) walks
+  // the dependency graph, finds nothing that owns .prisma, and omits it. The
+  // resulting image contains @prisma/client, which is only a thin wrapper that
+  // requires .prisma/client at runtime, so the container builds cleanly and
+  // then dies on its first import with MODULE_NOT_FOUND.
+  //
+  // Emitting here makes the generated client a real file of this package, so
+  // it is carried by `pnpm deploy` and by `files` in package.json.
+  output = "../generated/client"
 }
 
 datasource db {

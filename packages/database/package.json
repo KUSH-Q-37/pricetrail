@@ -10,7 +10,7 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": ["dist", "generated"],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "generate": "dotenv -e ../../.env -- prisma generate",

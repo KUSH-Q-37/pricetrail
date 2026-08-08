@@ -1,6 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+// Generated client lives in ../generated/client (see schema.prisma) so that
+// `pnpm deploy` carries it into the Docker images.
+import { PrismaClient } from '../generated/client';
 
-export * from '@prisma/client';
+export * from '../generated/client';
 export * from './vector';
 
 /**

@@ -59,7 +59,10 @@ RUN pnpm --filter @pricetrail/database generate \
 #
 # `deploy` resolves the graph into a real, self-contained directory holding
 # only this app and its PRODUCTION dependencies.
-RUN CI=true pnpm --filter @pricetrail/api deploy --prod --legacy /deploy
+# No --legacy: with injectWorkspacePackages set in pnpm-workspace.yaml, deploy
+# materialises workspace packages as real directories carrying their own
+# resolved dependencies, so nothing needs hand-copying afterwards.
+RUN CI=true pnpm --filter @pricetrail/api deploy --prod /deploy
 
 # ---------------------------------------------------------------------------
 FROM base AS runtime
@@ -75,14 +78,9 @@ RUN addgroup -S app && adduser -S app -G app
 # One self-contained tree: dist, package.json and a real node_modules.
 COPY --from=build --chown=app:app /deploy ./
 
-# The GENERATED Prisma client, copied separately.
-#
-# `prisma generate` writes into node_modules/.prisma — a location that belongs
-# to no package, so `pnpm deploy` has nothing to resolve and leaves it out.
-# @prisma/client is present in the deployed tree but is only a thin wrapper
-# that requires .prisma/client at runtime, so without this the container starts
-# and dies on the first import with MODULE_NOT_FOUND.
-COPY --from=build --chown=app:app /app/node_modules/.prisma ./node_modules/.prisma
+# No separate Prisma copy needed: schema.prisma emits the client into
+# packages/database/generated, which is part of the package and therefore
+# carried by `pnpm deploy` above.
 
 USER app
 EXPOSE 3001

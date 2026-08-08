@@ -18,6 +18,10 @@ out/
 # prisma
 packages/database/prisma/*.db
 packages/database/prisma/*.db-journal
+# Generated Prisma client. Emitted into the package (rather than node_modules)
+# so `pnpm deploy` carries it into the Docker images — but it is still build
+# output, recreated by `prisma generate`, and must not be committed.
+packages/database/generated/
 
 # logs
 *.log

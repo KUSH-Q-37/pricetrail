@@ -28,7 +28,7 @@ import {
   MatchedBy,
   UserRole,
   PlanTier,
-} from '@prisma/client';
+} from '../generated/client';
 
 const prisma = new PrismaClient();
 
