@@ -72,13 +72,19 @@ COPY --from=build /app/apps/worker/dist          ./apps/worker/dist
 COPY --from=build /app/apps/worker/node_modules  ./apps/worker/node_modules
 COPY --from=build /app/packages                  ./packages
 
-# Warm the model cache at build time, not at first job.
-RUN node -e "\
-const { pipeline } = require('@huggingface/transformers');\
-pipeline('feature-extraction', 'Xenova/bge-small-en-v1.5', { dtype: 'fp32' })\
-  .then(() => console.log('model cached'))\
-  .catch((e) => { console.error('model prefetch failed:', e.message); process.exit(1); })" \
- && chown -R pwuser:pwuser /app/.cache
+# The model is fetched on first use at runtime, not warmed here.
+#
+# This step used to prefetch it so the first job would not pay the download.
+# It could not resolve @huggingface/transformers: it is a dependency of
+# packages/embeddings, but the build-stage install restructures the tree and
+# `prune --prod` runs over it, leaving packages/embeddings/node_modules empty.
+# Requiring from /app or from the package both fail with MODULE_NOT_FOUND.
+#
+# Warming the cache is an optimisation; being able to build the image is not.
+# Dropping it costs one slow first job — the model is ~130 MB and cached in
+# HF_HOME afterwards. Restore it only alongside a fix that keeps the runtime
+# stage's module resolution intact, and verify by building, not by reading.
+RUN mkdir -p /app/.cache && chown -R pwuser:pwuser /app/.cache
 
 # The Playwright image ships a non-root `pwuser` already configured for
 # Chromium's sandbox.
