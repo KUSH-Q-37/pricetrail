@@ -8,7 +8,9 @@
     "node": ">=20.11.0"
   },
   "scripts": {
-    "build": "pnpm --filter @pricetrail/database build && pnpm --filter @pricetrail/api build",
+    "build": "pnpm build:packages && pnpm build:apps",
+    "build:packages": "pnpm --filter @pricetrail/database build && pnpm --filter @pricetrail/queue build && pnpm --filter @pricetrail/marketplace build && pnpm --filter @pricetrail/matching build && pnpm --filter @pricetrail/embeddings build",
+    "build:apps": "pnpm --filter @pricetrail/api build && pnpm --filter @pricetrail/worker build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r --filter \"./packages/**\" test",
     "test:coverage": "pnpm --filter @pricetrail/matching test:coverage && pnpm --filter @pricetrail/marketplace test:coverage",
