@@ -38,13 +38,18 @@ jobs:
       # Prisma Client is generated code; nothing typechecks without it.
       - run: pnpm --filter @pricetrail/database generate
 
+      # Use the root script rather than restating the list here. This step used
+      # to duplicate it, and the copy went stale the moment a new build
+      # dependency was added — CI failed on a missing module that resolved fine
+      # locally, because a developer's dist/ was already populated.
       - name: Build workspace packages
-        run: |
-          pnpm --filter @pricetrail/database build
-          pnpm --filter @pricetrail/queue build
-          pnpm --filter @pricetrail/marketplace build
-          pnpm --filter @pricetrail/matching build
-          pnpm --filter @pricetrail/embeddings build
+        run: pnpm build:packages
+
+      # apps/api imports @pricetrail/worker (it can host the queue consumers
+      # in-process), and that import resolves to the worker's dist/index.d.ts.
+      # Without this, `tsc --noEmit` on the API cannot find the module.
+      - name: Build worker (apps/api typechecks against its types)
+        run: pnpm --filter @pricetrail/worker build
 
       - run: pnpm -r typecheck
 
@@ -108,13 +113,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @pricetrail/database generate
 
+      # One definition of build order, in package.json. See the note in the
+      # typecheck job about why this is not restated inline.
       - name: Build packages
-        run: |
-          pnpm --filter @pricetrail/database build
-          pnpm --filter @pricetrail/queue build
-          pnpm --filter @pricetrail/marketplace build
-          pnpm --filter @pricetrail/matching build
-          pnpm --filter @pricetrail/embeddings build
+        run: pnpm build:packages
 
       # migrate deploy, not migrate dev: deploy is non-interactive and never
       # attempts to create a shadow database or prompt about drift.
