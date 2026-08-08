@@ -13,21 +13,28 @@
  */
 const SENTINEL_ORIGIN = 'https://pricetrail.invalid';
 
+/** Where a signed-in user lands when no explicit destination was requested. */
+export const DEFAULT_SIGNED_IN_PATH = '/dashboard';
+
 export function safeRedirectPath(next: string | null | undefined): string {
-  if (!next) return '/';
+  // `/` is the public marketing page — sending a user who just signed in there
+  // would look like the login silently failed.
+  if (!next || next === '/') return DEFAULT_SIGNED_IN_PATH;
 
   try {
     const url = new URL(next, SENTINEL_ORIGIN);
 
     // Anything that resolved away from the sentinel origin was absolute,
     // protocol-relative, or normalised into one of those.
-    if (url.origin !== SENTINEL_ORIGIN) return '/';
+    if (url.origin !== SENTINEL_ORIGIN) return DEFAULT_SIGNED_IN_PATH;
 
     const path = `${url.pathname}${url.search}${url.hash}`;
 
     // Defence in depth: a same-origin result must still look like a path.
-    return path.startsWith('/') && !path.startsWith('//') ? path : '/';
+    return path.startsWith('/') && !path.startsWith('//')
+      ? path
+      : DEFAULT_SIGNED_IN_PATH;
   } catch {
-    return '/';
+    return DEFAULT_SIGNED_IN_PATH;
   }
 }

@@ -9,8 +9,9 @@ import { useEffect } from 'react';
 import { useUiStore } from '@/stores/ui-store';
 import { cn } from '@/lib/utils';
 
+// `/` is now the public marketing page; the dashboard moved to /dashboard.
 const navigation = [
-  { href: '/', label: 'Dashboard', Icon: LayoutDashboard },
+  { href: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
   { href: '/products', label: 'Products', Icon: Package },
   { href: '/compare', label: 'Compare', Icon: LineChart },
   { href: '/settings', label: 'Settings', Icon: Settings },
@@ -22,7 +23,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav className="flex flex-col gap-1 p-3" aria-label="Main">
       {navigation.map(({ href, label, Icon }) => {
-        const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
+        const active = pathname === href || pathname.startsWith(`${href}/`);
 
         return (
           <Link
