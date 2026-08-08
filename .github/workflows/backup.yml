@@ -11,14 +11,16 @@
 #
 # SETUP (once):
 #   GitHub → repo → Settings → Secrets and variables → Actions → New secret
-#     Name:  BACKUP_DATABASE_URL
-#     Value: the SESSION pooler string — port 5432, the same value as DIRECT_URL
+#   Three secrets, each a plain value — do NOT percent-encode anything:
+#     PGHOST      aws-0-ap-south-1.pooler.supabase.com
+#     PGUSER      postgres.<your-project-ref>
+#     PGPASSWORD  your database password, exactly as Supabase shows it
 #
-#   Port 5432, NOT the 6543 pooler the app uses. pg_dump needs a session-level
-#   connection: it holds a repeatable-read snapshot and issues SET and COPY
-#   across statements. PgBouncer in transaction mode hands each statement to a
-#   different backend, so the dump aborts. This is the same reason DIRECT_URL
-#   exists separately from DATABASE_URL.
+#   Port 5432 is fixed in the job, not a secret. 6543 is the transaction pooler
+#   and pg_dump cannot use it: a dump holds a repeatable-read snapshot and
+#   issues SET and COPY across statements, while PgBouncer in transaction mode
+#   hands each statement to a different backend. Same reason DIRECT_URL exists
+#   separately from DATABASE_URL.
 #
 # RESTORE:
 #   Download the artifact, unzip, then:
@@ -44,30 +46,37 @@ jobs:
     steps:
       - name: Dump database
         env:
-          # Falls back to DATABASE_URL so an existing secret keeps working, but
-          # the check below will reject it if it points at the pooler.
-          DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL || secrets.DATABASE_URL }}
+          # Discrete values, not a URL. A Supabase password routinely contains
+          # @ # $ &, and in a URL those must be percent-encoded — an unencoded
+          # @ makes the parser split there and read the rest of the password as
+          # the hostname ("could not translate host name 721755@aws-0-..."),
+          # which names everything except the actual cause.
+          #
+          # pg_dump reads PG* natively, so PGPASSWORD is taken literally and no
+          # encoding rule exists to get wrong.
+          PGHOST: ${{ secrets.PGHOST }}
+          PGUSER: ${{ secrets.PGUSER }}
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+          PGPORT: '5432'
+          PGDATABASE: postgres
         run: |
-          if [ -z "$DATABASE_URL" ]; then
-            echo "::error::No BACKUP_DATABASE_URL (or DATABASE_URL) secret is set — see the setup note in this file."
+          if [ -z "$PGHOST" ] || [ -z "$PGUSER" ] || [ -z "$PGPASSWORD" ]; then
+            echo "::error::Set PGHOST, PGUSER and PGPASSWORD secrets — see the setup note in this file."
             exit 1
           fi
 
-          # Fail here with an explanation rather than deep inside pg_dump with
-          # a connection error that says nothing about the cause.
-          case "$DATABASE_URL" in
-            *:6543/*|*pgbouncer=true*)
-              echo "::error::This is the transaction pooler (port 6543). pg_dump needs a session connection — use the port 5432 string, the same value as DIRECT_URL."
-              exit 1
-              ;;
-          esac
-
+          # Port 5432 is hardcoded above rather than taken from a secret: 6543
+          # is the transaction pooler, and pg_dump cannot run through it at all.
+          # Making it un-settable removes the only wrong answer.
+          #
           # pg_dump runs in a container rather than from apt, so the client
           # version is pinned and cannot drift behind the server. pg_dump
           # refuses to dump a server newer than itself, and a backup job that
           # only fails after an upstream upgrade is worse than no job at all.
-          docker run --rm -e PGURL="$DATABASE_URL" postgres:17-alpine \
-            sh -c 'pg_dump "$PGURL" --no-owner --no-privileges' > pricetrail-backup.sql
+          docker run --rm \
+            -e PGHOST -e PGUSER -e PGPASSWORD -e PGPORT -e PGDATABASE \
+            postgres:17-alpine \
+            pg_dump --no-owner --no-privileges > pricetrail-backup.sql
 
           # A dump that "succeeded" but is empty is the classic silent backup
           # failure. Fail loudly instead.
