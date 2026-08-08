@@ -1,0 +1,64 @@
+# Keeps the free tiers alive.
+#
+# Two free-tier behaviours quietly break this product:
+#
+#   - Render sleeps a free web service after ~15 minutes idle, and a sleeping
+#     process runs no cron. The 02:00 sweep simply never fires.
+#   - Supabase pauses a free project after 7 days with no activity. A paused
+#     database does not error loudly; writes just stop.
+#
+# Both failures are silent, and the damage is permanent: a day with no
+# observation can never be backfilled, because neither marketplace publishes
+# past prices.
+#
+# A scheduled ping fixes both at once — waking the API also wakes the worker
+# runtime hosted inside it, and the health check touches Postgres. Chosen over
+# an external pinger (cron-job.org and similar) because those bill a cold start
+# as a failed check and email about it forever.
+#
+# Cost: four runs a day, a few seconds each — far inside the free Actions
+# allowance for a private repository.
+
+name: keepalive
+
+on:
+  schedule:
+    # Times are UTC. 01:45 sits just before the 02:00 sweep so the service is
+    # already warm when BullMQ fires it; the rest are spread to keep Supabase
+    # from counting a quiet day toward its 7-day pause.
+    - cron: '45 1,7,13,19 * * *'
+  workflow_dispatch:
+
+# Never let two pings overlap.
+concurrency:
+  group: keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    name: wake API and database
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Ping health endpoint
+        run: |
+          # --max-time 90, not the default: a cold Render start takes 30-50s,
+          # and timing out early would report a working service as broken.
+          # /health/ready is used deliberately over /health/live — ready checks
+          # Postgres and Redis, so this doubles as the activity that keeps
+          # Supabase from pausing.
+          for attempt in 1 2 3; do
+            echo "attempt $attempt"
+            if curl -fsS --max-time 90 https://pricetrail-api.onrender.com/health/ready; then
+              echo ""
+              echo "awake"
+              exit 0
+            fi
+            echo "no response; retrying in 30s"
+            sleep 30
+          done
+
+          echo "::error::API did not respond after 3 attempts over ~5 minutes."
+          echo "Check https://dashboard.render.com and whether Supabase is paused."
+          exit 1

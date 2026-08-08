@@ -1,0 +1,76 @@
+# Weekly database backup.
+#
+# The free Supabase tier has no point-in-time recovery. A bad migration, a
+# mistaken delete, or a paused-then-reaped project takes the price history with
+# it — and that history is the one thing in this system that cannot be rebuilt.
+# Code can be rewritten in a day; an observation from three months ago is gone
+# for good, because neither marketplace publishes past prices.
+#
+# So this runs on the cheapest thing available: a scheduled Action, dumping to
+# an artifact. Not as good as managed PITR. Enormously better than nothing.
+#
+# SETUP (once):
+#   GitHub → repo → Settings → Secrets and variables → Actions → New secret
+#     Name:  DATABASE_URL
+#     Value: your Supabase POOLER connection string (port 6543)
+#
+# RESTORE:
+#   Download the artifact, unzip, then:
+#     psql "$DATABASE_URL" < pricetrail-backup.sql
+
+name: backup
+
+on:
+  schedule:
+    - cron: '30 20 * * 0' # Sundays 20:30 UTC = 02:00 IST Monday
+  workflow_dispatch:
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  dump:
+    name: pg_dump to artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Dump database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL secret is not set — see the setup note in this file."
+            exit 1
+          fi
+
+          # pg_dump runs in a container rather than from apt, so the client
+          # version is pinned and cannot drift behind the server. pg_dump
+          # refuses to dump a server newer than itself, and a backup job that
+          # only fails after an upstream upgrade is worse than no job at all.
+          docker run --rm -e PGURL="$DATABASE_URL" postgres:17-alpine \
+            sh -c 'pg_dump "$PGURL" --no-owner --no-privileges' > pricetrail-backup.sql
+
+          # A dump that "succeeded" but is empty is the classic silent backup
+          # failure. Fail loudly instead.
+          BYTES=$(wc -c < pricetrail-backup.sql)
+          echo "dump size: $BYTES bytes"
+          if [ "$BYTES" -lt 10000 ]; then
+            echo "::error::Dump is implausibly small ($BYTES bytes) — treating as failed."
+            exit 1
+          fi
+
+          # Prove the data is actually in there, not just the schema.
+          grep -q "COPY public.price_points" pricetrail-backup.sql \
+            || echo "::warning::No price_points COPY block found. Fine if you have no history yet."
+
+          gzip pricetrail-backup.sql
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: pricetrail-backup-${{ github.run_number }}
+          path: pricetrail-backup.sql.gz
+          retention-days: 90
+          if-no-files-found: error
