@@ -25,6 +25,10 @@ FROM base AS deps
 # alone, so editing a .ts file does not invalidate a multi-minute install.
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/api/package.json                 apps/api/
+# The API imports @pricetrail/worker (it can host the queue consumers
+# in-process). Without this manifest pnpm never sees the project, the workspace
+# link is never created, and the build stage cannot resolve the module.
+COPY apps/worker/package.json              apps/worker/
 COPY packages/database/package.json        packages/database/
 COPY packages/marketplace/package.json     packages/marketplace/
 COPY packages/matching/package.json        packages/matching/
@@ -42,12 +46,14 @@ FROM deps AS build
 COPY . .
 # Prisma Client is generated code — it does not exist until this runs, and the
 # API will not compile without it.
+#
+# Build order lives in package.json, not restated here. This step used to
+# duplicate it, and the copy went stale the moment the API gained a new
+# workspace dependency — the image then failed on a module that resolved
+# correctly everywhere else.
 RUN pnpm --filter @pricetrail/database generate \
- && pnpm --filter @pricetrail/database build \
- && pnpm --filter @pricetrail/queue build \
- && pnpm --filter @pricetrail/marketplace build \
- && pnpm --filter @pricetrail/matching build \
- && pnpm --filter @pricetrail/api build
+ && pnpm build:packages \
+ && pnpm build:apps
 
 # `pnpm deploy` — NOT a hand-rolled copy of node_modules.
 #
@@ -59,10 +65,23 @@ RUN pnpm --filter @pricetrail/database generate \
 #
 # `deploy` resolves the graph into a real, self-contained directory holding
 # only this app and its PRODUCTION dependencies.
-# No --legacy: with injectWorkspacePackages set in pnpm-workspace.yaml, deploy
-# materialises workspace packages as real directories carrying their own
-# resolved dependencies, so nothing needs hand-copying afterwards.
-RUN CI=true pnpm --filter @pricetrail/api deploy --prod /deploy
+#
+# Injection is passed as per-command config, and that detail is the whole fix.
+#
+# `deploy` needs inject-workspace-packages to materialise @pricetrail/* as real
+# directories. Without it (including with --legacy) the deploy tree contains
+# only this app, and node_modules/@pricetrail/* are symlinks pointing at
+# /app/packages and /app/apps — neither of which exists in the runtime image.
+# Every one of them dangles and the container dies with MODULE_NOT_FOUND on a
+# package that `ls` shows is right there.
+#
+# Setting it in pnpm-workspace.yaml fixes the image and breaks local
+# development: it changes how every workspace dependency is linked, and the
+# worker stopped resolving @pricetrail/queue. `--config.` scopes it to this one
+# invocation, so the container gets a flat self-contained tree and nobody's dev
+# environment changes to buy it.
+RUN CI=true pnpm --filter @pricetrail/api deploy --prod \
+      --config.inject-workspace-packages=true /deploy
 
 # ---------------------------------------------------------------------------
 FROM base AS runtime

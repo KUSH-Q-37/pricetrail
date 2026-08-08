@@ -197,6 +197,15 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @pricetrail/database generate
       - run: pnpm build
+
+      # `pnpm build` covers the server deployables only — Vercel builds the web
+      # app in production, so the root script deliberately leaves it out. This
+      # job runs `next start`, which serves a prebuilt .next/ and exits
+      # immediately if there isn't one, so it has to be built explicitly here.
+      # Missing it, web never listened on 3000 and the only symptom was
+      # wait-on timing out with nothing to point at.
+      - run: pnpm build:web
+
       - run: pnpm --filter @pricetrail/database migrate:deploy
       - run: pnpm --filter @pricetrail/database seed
 
