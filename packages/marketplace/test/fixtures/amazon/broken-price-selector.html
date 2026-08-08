@@ -1,0 +1,29 @@
+<!doctype html>
+<!--
+  Simulates the most dangerous real-world failure: Amazon ships a layout change,
+  the price selector stops matching, but the page is otherwise a perfectly valid
+  in-stock product.
+
+  A fetcher that "succeeds" here writes a null price over a live product and
+  silently ends its price series. The boundary schema must REJECT this.
+-->
+<html lang="en">
+<head><title>Some Product</title></head>
+<body>
+  <span id="productTitle">Samsung Galaxy S24 Ultra 5G (512 GB) Titanium Grey</span>
+  <a id="bylineInfo">Visit the Samsung Store</a>
+
+  <!-- Price now lives under a class the selectors do not know about -->
+  <div id="brandNewPriceContainer">
+    <span class="brand-new-price-class">₹1,29,999.00</span>
+  </div>
+
+  <div id="availability"><span class="a-color-success">In stock</span></div>
+
+  <table id="productDetails_techSpec_section_1">
+    <tr><th>Item model number</th><td>SM-S928B</td></tr>
+    <tr><th>RAM</th><td>12 GB</td></tr>
+    <tr><th>Internal Storage</th><td>512 GB</td></tr>
+  </table>
+</body>
+</html>

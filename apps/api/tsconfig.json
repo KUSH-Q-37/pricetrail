@@ -1,0 +1,47 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "moduleResolution": "node",
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "rootDir": "./src",
+    "sourceMap": true,
+
+    // The build-info file MUST live inside outDir.
+    //
+    // nest-cli sets deleteOutDir: true, which wipes dist/ before each build.
+    // With the default location (./tsconfig.tsbuildinfo, outside dist), tsc
+    // consults a manifest claiming every unchanged file was already emitted,
+    // skips them, and produces a dist/ containing only the files you edited —
+    // exiting 0 the whole time. The result is a build that fails at runtime
+    // with MODULE_NOT_FOUND on a file that compiles perfectly.
+    // Keeping it inside dist means clean and manifest are deleted together.
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "declaration": false,
+    "removeComments": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+
+    // NestJS DI reads parameter types from emitted metadata. Without these
+    // two, every constructor injection resolves to `Object` and the container
+    // throws "Nest can't resolve dependencies" at runtime.
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // Nest's decorator-based DI legitimately leaves properties assigned by the
+    // framework rather than the constructor.
+    "strictPropertyInitialization": false
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "test"]
+}

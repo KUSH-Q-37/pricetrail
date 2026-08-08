@@ -1,0 +1,33 @@
+# Normalise line endings.
+#
+# Without this, Git on Windows converts LF to CRLF in the working copy and
+# warns on every single file, every commit. Worse, the repo then produces
+# phantom "entire file changed" diffs the moment it is cloned on Linux or
+# macOS — or in a CI container, which is where it actually bites.
+#
+# `text=auto eol=lf` stores everything as LF in the repository (the portable
+# choice) while leaving each developer's working copy alone.
+* text=auto eol=lf
+
+# Binary — never touch these.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+*.onnx binary
+
+# Generated. Collapsed in GitHub diffs and excluded from language stats, so a
+# 20k-line lockfile does not bury the actual change in a pull request.
+pnpm-lock.yaml linguist-generated=true -diff
+
+# Scraper fixtures are saved marketplace HTML, not code we author.
+packages/marketplace/test/fixtures/**/*.html linguist-vendored=true
+
+# SQL migrations are append-only history. Marked so a reviewer sees at a
+# glance that editing one is not a normal change.
+packages/database/prisma/migrations/**/*.sql linguist-language=SQL

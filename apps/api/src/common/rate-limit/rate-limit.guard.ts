@@ -1,0 +1,113 @@
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import type { Request, Response } from 'express';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+
+import { AppConfigService } from '../../config/app-config.service';
+import { RedisService } from '../../infra/redis/redis.service';
+import { RequestContextStore } from '../context/request-context';
+import { RateLimitedError } from '../errors/app-error';
+import {
+  RATE_LIMIT_KEY,
+  SKIP_RATE_LIMIT_KEY,
+  type RateLimitOptions,
+} from './rate-limit.decorator';
+
+/**
+ * Atomic fixed-window counter.
+ *
+ * INCR and EXPIRE must be one operation. Issued separately, a process that
+ * dies between them leaves a key with no TTL — that client is then locked out
+ * permanently, because the counter never resets. A Lua script runs
+ * server-side as a single atomic unit and removes the window entirely.
+ */
+const INCREMENT_SCRIPT = `
+local current = redis.call('INCR', KEYS[1])
+if current == 1 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return { current, redis.call('TTL', KEYS[1]) }
+`;
+
+@Injectable()
+export class RateLimitGuard implements CanActivate {
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly redis: RedisService,
+    private readonly config: AppConfigService,
+    @InjectPinoLogger(RateLimitGuard.name)
+    private readonly logger: PinoLogger,
+  ) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    if (context.getType() !== 'http') return true;
+
+    const skip = this.reflector.getAllAndOverride<boolean>(
+      SKIP_RATE_LIMIT_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    if (skip) return true;
+
+    const options =
+      this.reflector.getAllAndOverride<RateLimitOptions>(RATE_LIMIT_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ]) ?? this.config.rateLimit;
+
+    const request = context.switchToHttp().getRequest<Request>();
+    const response = context.switchToHttp().getResponse<Response>();
+    const key = this.buildKey(request, context);
+
+    let count: number;
+    let ttl: number;
+
+    try {
+      const [rawCount, rawTtl] = (await this.redis.client.eval(
+        INCREMENT_SCRIPT,
+        1,
+        key,
+        String(options.windowSeconds),
+      )) as [number, number];
+
+      count = rawCount;
+      ttl = rawTtl;
+    } catch (error) {
+      // Fail OPEN. Rate limiting is a protective measure, not a correctness
+      // one — a Redis outage should degrade protection, not take the whole API
+      // down with it. Logged at error so the outage is still loud.
+      this.logger.error({ err: error }, 'Rate limit check failed; allowing request');
+      return true;
+    }
+
+    const remaining = Math.max(0, options.maxRequests - count);
+    const resetSeconds = ttl >= 0 ? ttl : options.windowSeconds;
+
+    // Draft IETF RateLimit header fields — clients can self-throttle instead
+    // of discovering the limit by being rejected.
+    response.setHeader('RateLimit-Limit', options.maxRequests);
+    response.setHeader('RateLimit-Remaining', remaining);
+    response.setHeader('RateLimit-Reset', resetSeconds);
+
+    if (count > options.maxRequests) {
+      response.setHeader('Retry-After', resetSeconds);
+      throw new RateLimitedError(resetSeconds);
+    }
+
+    return true;
+  }
+
+  /**
+   * Bucket per identity per route.
+   *
+   * Authenticated users are keyed by user id so a shared NAT or office IP does
+   * not throttle everyone at once. Anonymous callers fall back to IP, which
+   * requires `trust proxy` to be set correctly — otherwise every request
+   * appears to come from the load balancer and shares one bucket.
+   */
+  private buildKey(request: Request, context: ExecutionContext): string {
+    const userId = RequestContextStore.get()?.userId;
+    const identity = userId ? `user:${userId}` : `ip:${request.ip ?? 'unknown'}`;
+    const route = `${request.method}:${context.getClass().name}.${context.getHandler().name}`;
+    return `ratelimit:${identity}:${route}`;
+  }
+}

@@ -1,0 +1,245 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A new push supersedes an in-flight run on the same branch. Without this,
+# pushing three times in a minute runs three full pipelines and the two stale
+# ones still burn minutes and can report misleading statuses.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Fast feedback: no database, no browser. Fails in ~2 minutes when something
+  # is obviously wrong, so nobody waits on the slow jobs to learn that.
+  # ---------------------------------------------------------------------------
+  static:
+    name: typecheck + unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Prisma Client is generated code; nothing typechecks without it.
+      - run: pnpm --filter @pricetrail/database generate
+
+      - name: Build workspace packages
+        run: |
+          pnpm --filter @pricetrail/database build
+          pnpm --filter @pricetrail/queue build
+          pnpm --filter @pricetrail/marketplace build
+          pnpm --filter @pricetrail/matching build
+          pnpm --filter @pricetrail/embeddings build
+
+      - run: pnpm -r typecheck
+
+      # Coverage thresholds are enforced in each vitest.config.ts, so this step
+      # fails the build below 80% rather than merely reporting a number.
+      - name: Unit tests with coverage gates
+        run: pnpm test:coverage
+
+  # ---------------------------------------------------------------------------
+  # Integration: real Postgres with pgvector, real Redis. These catch the
+  # things unit tests structurally cannot — partition routing, HNSW search,
+  # constraint violations, transaction behaviour.
+  # ---------------------------------------------------------------------------
+  integration:
+    name: integration (postgres + redis)
+    runs-on: ubuntu-latest
+    needs: static
+
+    services:
+      postgres:
+        # Must be the pgvector image. Stock postgres fails at CREATE EXTENSION
+        # vector, and the very first migration declares a vector(384) column.
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: pricetrail
+          POSTGRES_PASSWORD: pricetrail_ci
+          POSTGRES_DB: pricetrail_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U pricetrail -d pricetrail_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+
+    env:
+      # A DISPOSABLE database, not a shared one. Each run gets a fresh service
+      # container, so tests may mutate freely and cannot leak into another run.
+      DATABASE_URL: postgresql://pricetrail:pricetrail_ci@localhost:5432/pricetrail_test?schema=public
+      DIRECT_URL: postgresql://pricetrail:pricetrail_ci@localhost:5432/pricetrail_test?schema=public
+      REDIS_URL: redis://localhost:6379
+      NODE_ENV: test
+      TZ: UTC
+      APP_TIMEZONE: Asia/Kolkata
+      AUTH_MODE: local-dev
+      LOCAL_DEV_AUTH_SECRET: ci-only-secret-not-used-anywhere-else-32ch
+      SWAGGER_ENABLED: 'false'
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @pricetrail/database generate
+
+      - name: Build packages
+        run: |
+          pnpm --filter @pricetrail/database build
+          pnpm --filter @pricetrail/queue build
+          pnpm --filter @pricetrail/marketplace build
+          pnpm --filter @pricetrail/matching build
+          pnpm --filter @pricetrail/embeddings build
+
+      # migrate deploy, not migrate dev: deploy is non-interactive and never
+      # attempts to create a shadow database or prompt about drift.
+      - name: Apply migrations
+        run: pnpm --filter @pricetrail/database migrate:deploy
+
+      - name: Verify pgvector, partitions and indexes exist
+        run: |
+          PGPASSWORD=pricetrail_ci psql -h localhost -U pricetrail -d pricetrail_test -tAc "
+            SELECT 'extensions=' || count(*) FROM pg_extension WHERE extname IN ('vector','pg_trgm');
+            SELECT 'partitions=' || count(*) FROM pg_class WHERE relkind='r' AND relname LIKE 'price_points_2%';
+            SELECT 'hnsw=' || count(*) FROM pg_indexes WHERE indexdef LIKE '%hnsw%';
+          "
+
+      - run: pnpm --filter @pricetrail/database seed
+
+      - name: Worker integration + pipeline suites
+        run: |
+          pnpm --filter @pricetrail/worker test:integration
+          pnpm --filter @pricetrail/worker test:pipeline
+
+  # ---------------------------------------------------------------------------
+  # E2E: the whole stack in a browser. Slowest, so it runs last and only after
+  # everything cheaper has passed.
+  # ---------------------------------------------------------------------------
+  e2e:
+    name: e2e (playwright)
+    runs-on: ubuntu-latest
+    needs: integration
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: pricetrail
+          POSTGRES_PASSWORD: pricetrail_ci
+          POSTGRES_DB: pricetrail_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U pricetrail -d pricetrail_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+
+    env:
+      DATABASE_URL: postgresql://pricetrail:pricetrail_ci@localhost:5432/pricetrail_test?schema=public
+      DIRECT_URL: postgresql://pricetrail:pricetrail_ci@localhost:5432/pricetrail_test?schema=public
+      REDIS_URL: redis://localhost:6379
+      NODE_ENV: production
+      TZ: UTC
+      APP_TIMEZONE: Asia/Kolkata
+      PORT: '3001'
+      # E2E signs in through the dev-token endpoint. NODE_ENV is production
+      # here to exercise the real build, and the env schema REFUSES that
+      # combination — so this job runs the API with NODE_ENV=test explicitly.
+      CORS_ORIGINS: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      NEXT_PUBLIC_AUTH_MODE: local-dev
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @pricetrail/database generate
+      - run: pnpm build
+      - run: pnpm --filter @pricetrail/database migrate:deploy
+      - run: pnpm --filter @pricetrail/database seed
+
+      - run: pnpm --filter @pricetrail/web exec playwright install --with-deps chromium
+
+      - name: Start API and web
+        env:
+          NODE_ENV: test
+          AUTH_MODE: local-dev
+          LOCAL_DEV_AUTH_SECRET: ci-only-secret-not-used-anywhere-else-32ch
+        run: |
+          node apps/api/dist/main.js &
+          pnpm --filter @pricetrail/web start &
+          npx wait-on http://localhost:3001/health/live http://localhost:3000/login -t 90000
+
+      - run: pnpm --filter @pricetrail/web test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-failures
+          path: apps/web/test-results/
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Images build only after every test passes. A green build of a broken commit
+  # is worse than no build — it produces a deployable artefact nobody should
+  # deploy.
+  # ---------------------------------------------------------------------------
+  images:
+    name: build images
+    runs-on: ubuntu-latest
+    needs: [static, integration]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/worker/Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

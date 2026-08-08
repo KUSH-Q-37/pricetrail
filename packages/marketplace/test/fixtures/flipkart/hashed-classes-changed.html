@@ -1,0 +1,40 @@
+<!doctype html>
+<!--
+  THE SCENARIO THIS ARCHITECTURE EXISTS FOR.
+
+  Flipkart redeployed their frontend overnight. Every build-generated class
+  hash is different: .Nx9bqj -> .qWx8Fp, .VU-ZEz -> .kL2mNq, and so on. A
+  DOM-first parser returns nothing at all and the product's price series stops.
+
+  The JSON-LD block is unchanged, because it is emitted for search engines and
+  Flipkart has a commercial reason to keep it stable. Reading that first means
+  this page still parses perfectly.
+-->
+<html lang="en">
+<head>
+  <title>Sony WH-1000XM5</title>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org/",
+    "@type": "Product",
+    "name": "SONY WH-1000XM5 Bluetooth Headset (Black, On the Ear)",
+    "sku": "ACCGXYZ7HFGHZZZZ",
+    "image": "https://rukminim2.flixcart.com/image/416/416/xif0q/headphone/sony-xm5.jpeg",
+    "brand": {"@type": "Brand", "name": "SONY"},
+    "aggregateRating": {"@type": "AggregateRating", "ratingValue": "4.5", "ratingCount": "8934"},
+    "offers": {
+      "@type": "Offer",
+      "priceCurrency": "INR",
+      "price": "26990",
+      "availability": "https://schema.org/InStock",
+      "seller": {"@type": "Organization", "name": "OmniTechRetail"}
+    }
+  }
+  </script>
+</head>
+<body>
+  <h1><span class="kL2mNq">SONY WH-1000XM5 Bluetooth Headset (Black, On the Ear)</span></h1>
+  <div class="qWx8Fp zZaRtY">₹26,990</div>
+  <div class="pQr3sT">₹34,990</div>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "name": "@pricetrail/worker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "embed:backfill": "dotenv -e ../../.env -- tsx src/scripts/backfill-embeddings.ts",
+    "match:run": "dotenv -e ../../.env -- tsx src/scripts/run-matching.ts",
+    "start": "dotenv -e ../../.env -- node dist/main.js",
+    "dev": "dotenv -e ../../.env -- tsx watch src/main.ts",
+    "test:integration": "dotenv -e ../../.env -- tsx test/integration.ts",
+    "test:pipeline": "dotenv -e ../../.env -- tsx test/pipeline.ts"
+  },
+  "dependencies": {
+    "@pricetrail/database": "workspace:*",
+    "@pricetrail/embeddings": "workspace:*",
+    "@pricetrail/marketplace": "workspace:*",
+    "@pricetrail/matching": "workspace:*",
+    "@pricetrail/queue": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "dotenv-cli": "^11.0.0",
+    "tsx": "^4.23.7",
+    "typescript": "^5.9.2",
+    "vitest": "^4.1.10"
+  }
+}

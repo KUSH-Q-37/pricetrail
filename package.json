@@ -1,0 +1,35 @@
+{
+  "name": "pricetrail",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Amazon + Flipkart daily price tracking and history charts",
+  "packageManager": "pnpm@11.20.0",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "build": "pnpm --filter @pricetrail/database build && pnpm --filter @pricetrail/api build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r --filter \"./packages/**\" test",
+    "test:coverage": "pnpm --filter @pricetrail/matching test:coverage && pnpm --filter @pricetrail/marketplace test:coverage",
+    "test:e2e": "pnpm --filter @pricetrail/web test:e2e",
+    "api:dev": "pnpm --filter @pricetrail/api dev",
+    "api:start": "pnpm --filter @pricetrail/api start",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "infra:nuke": "docker compose down -v",
+    "infra:logs": "docker compose logs -f",
+    "db:generate": "pnpm --filter @pricetrail/database generate",
+    "db:migrate": "pnpm --filter @pricetrail/database migrate:dev",
+    "db:migrate:deploy": "pnpm --filter @pricetrail/database migrate:deploy",
+    "db:reset": "pnpm --filter @pricetrail/database migrate:reset",
+    "db:studio": "pnpm --filter @pricetrail/database studio",
+    "db:seed": "pnpm --filter @pricetrail/database seed"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.10",
+    "typescript": "^5.9.2",
+    "vitest": "^4.1.10"
+  }
+}
+

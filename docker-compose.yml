@@ -1,0 +1,74 @@
+# Local development infrastructure only. Production uses Supabase Postgres
+# and a managed Redis — see docs/phase-01-architecture.md.
+#
+# Memory limits are deliberately tight: this is tuned for an 8 GB dev machine
+# where Postgres + Redis must fit alongside Node, VS Code and a browser.
+
+services:
+  postgres:
+    # pgvector/pgvector ships stock Postgres with the vector extension already
+    # compiled in. Using plain `postgres:17` would fail at CREATE EXTENSION.
+    image: pgvector/pgvector:pg17
+    container_name: pricetrail-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pricetrail
+      POSTGRES_PASSWORD: pricetrail_dev_password
+      POSTGRES_DB: pricetrail
+      # Deterministic collation. Without this, ordering can differ between
+      # your machine and CI, which silently breaks index-backed sorts.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=128MB"
+      - "-c"
+      - "work_mem=8MB"
+      - "-c"
+      - "max_connections=50"
+      # Log anything slower than 200ms so index regressions surface during dev
+      # rather than in production.
+      - "-c"
+      - "log_min_duration_statement=200"
+    ports:
+      - "5432:5432"
+    volumes:
+      - pricetrail_pgdata:/var/lib/postgresql/data
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pricetrail -d pricetrail"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: pricetrail-redis
+    restart: unless-stopped
+    command:
+      - "redis-server"
+      - "--appendonly"
+      - "yes"
+      - "--maxmemory"
+      - "192mb"
+      # CRITICAL for BullMQ: any eviction policy other than noeviction lets
+      # Redis silently delete job keys under memory pressure, which destroys
+      # queued and in-flight jobs with no error. BullMQ warns about this at
+      # startup — do not "fix" the warning by changing this value.
+      - "--maxmemory-policy"
+      - "noeviction"
+    ports:
+      - "6379:6379"
+    volumes:
+      - pricetrail_redisdata:/data
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  pricetrail_pgdata:
+  pricetrail_redisdata:

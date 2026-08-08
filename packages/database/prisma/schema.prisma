@@ -1,0 +1,521 @@
+// ===========================================================================
+// PriceTrail — database schema
+// ===========================================================================
+//
+// CONVENTIONS (enforced throughout, do not deviate):
+//
+//   Money      Stored as INTEGER minor units (paise for INR), never Float,
+//              never Decimal. Field suffix `...Minor`. Rationale: exact
+//              arithmetic, 4 bytes instead of 8+, and no decimal.js round-trip
+//              in the API layer. Max safe value is 2,147,483,647 paise =
+//              Rs 21,474,836 — comfortably above any consumer listing.
+//
+//   Time       Every timestamp is `timestamptz` and stored in UTC. The only
+//              date-typed column is `price_points.captured_on`, which is the
+//              partition key and the "one observation per day" identity.
+//
+//   Naming     camelCase in Prisma, snake_case in Postgres via @map/@@map.
+//
+//   Deletes    Price history is never deleted. Users are soft-deleted
+//              (`deleted_at`). Everything else cascades from its owner.
+//
+// Things Prisma cannot express, applied in raw SQL migrations instead:
+//   - the `vector` and `pg_trgm` extensions
+//   - HNSW index on marketplace_listings.embedding
+//   - GIN trigram indexes on normalized_title columns
+//   - partial indexes (Prisma has no WHERE clause on @@index)
+//   - RANGE partitioning of price_points
+// ===========================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Migrations bypass the connection pooler: PgBouncer in transaction mode
+  // cannot hold the advisory locks or run the DDL that Migrate requires.
+  directUrl = env("DIRECT_URL")
+}
+
+// ===========================================================================
+// Enums
+// ===========================================================================
+
+enum Platform {
+  AMAZON
+  FLIPKART
+
+  @@map("platform")
+}
+
+/// Where a given row's data came from. API values are authoritative;
+/// SCRAPE values carry lower trust and are shown differently in admin views.
+enum DataSource {
+  API
+  SCRAPE
+
+  @@map("data_source")
+}
+
+enum ProductStatus {
+  PENDING
+  READY
+  FAILED
+  ARCHIVED
+
+  @@map("product_status")
+}
+
+enum Availability {
+  IN_STOCK
+  OUT_OF_STOCK
+  LIMITED_STOCK
+  PREORDER
+  DISCONTINUED
+  UNKNOWN
+
+  @@map("availability")
+}
+
+/// Drives which attribute set and which veto rules the matching engine
+/// applies. Scope is electronics + appliances (Phase 1 decision).
+enum ProductCategory {
+  PHONE
+  LAPTOP
+  TABLET
+  AUDIO
+  TELEVISION
+  REFRIGERATOR
+  WASHING_MACHINE
+  AIR_CONDITIONER
+  OTHER
+
+  @@map("product_category")
+}
+
+enum MatchStatus {
+  AUTO_CONFIRMED
+  NEEDS_REVIEW
+  REJECTED
+  HUMAN_CONFIRMED
+  HUMAN_REJECTED
+
+  @@map("match_status")
+}
+
+enum MatchedBy {
+  PIPELINE
+  HUMAN
+
+  @@map("matched_by")
+}
+
+enum ReviewDecision {
+  CONFIRMED
+  REJECTED
+
+  @@map("review_decision")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+
+  @@map("user_role")
+}
+
+enum PlanTier {
+  FREE
+  PRO
+  BUSINESS
+
+  @@map("plan_tier")
+}
+
+enum ScrapeJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+
+  @@map("scrape_job_status")
+}
+
+/// Which fetch path produced (or attempted) this observation. Ordered by
+/// preference: API first, plain HTTP + Cheerio next, headless browser last.
+enum FetchStrategy {
+  API
+  HTTP_CHEERIO
+  PLAYWRIGHT
+
+  @@map("fetch_strategy")
+}
+
+enum AlertStatus {
+  ACTIVE
+  TRIGGERED
+  DISABLED
+
+  @@map("alert_status")
+}
+
+// ===========================================================================
+// Users
+// ===========================================================================
+
+/// Application-side user record. Credentials live in Supabase Auth
+/// (`auth.users`); this table holds only product concerns and is joined by
+/// `supabase_user_id`. We never store passwords.
+model User {
+  id             String @id @default(uuid()) @db.Uuid
+  supabaseUserId String @unique @map("supabase_user_id") @db.Uuid
+  email          String @unique @db.VarChar(320)
+
+  displayName String?  @map("display_name") @db.VarChar(120)
+  role        UserRole @default(USER)
+  planTier    PlanTier @default(FREE) @map("plan_tier")
+
+  /// Max products this user may track concurrently. Enforced by a guard in
+  /// the API, not by the database.
+  trackingQuota Int     @default(10) @map("tracking_quota")
+  notifyByEmail Boolean @default(true) @map("notify_by_email")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  trackedProducts TrackedProduct[]
+  priceAlerts     PriceAlert[]
+  matchReviews    MatchReview[]
+
+  @@index([deletedAt])
+  @@map("users")
+}
+
+// ===========================================================================
+// Catalogue
+// ===========================================================================
+
+/// The canonical, platform-independent product concept — e.g. "iPhone 15 Pro
+/// 256 GB Natural Titanium". One Product has at most one listing per platform.
+///
+/// This is deliberately NOT "the Amazon product": it is the thing a user
+/// tracks, and the anchor that lets an Amazon listing and a Flipkart listing
+/// be charted on the same axes.
+model Product {
+  id       String          @id @default(uuid()) @db.Uuid
+  category ProductCategory @default(OTHER)
+
+  brand        String? @db.VarChar(120)
+  displayTitle String  @map("display_title") @db.VarChar(512)
+
+  /// Lowercased, punctuation-stripped, whitespace-collapsed title. This is
+  /// the column the pg_trgm GIN index is built on — never search on
+  /// display_title directly.
+  normalizedTitle String @map("normalized_title") @db.VarChar(512)
+
+  modelNumber String? @map("model_number") @db.VarChar(120)
+
+  /// Extracted, normalized attributes keyed by the category's attribute
+  /// schema (ram_gb, storage_gb, capacity_l, star_rating, ...). Written only
+  /// after Zod validation against that schema — never raw scraper output.
+  attributes Json @default("{}")
+
+  imageUrl String?       @map("image_url") @db.VarChar(1024)
+  status   ProductStatus @default(PENDING)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  listings  MarketplaceListing[]
+  trackedBy TrackedProduct[]
+
+  @@index([brand, modelNumber])
+  @@index([category])
+  @@index([status])
+  @@map("products")
+}
+
+/// One row per platform listing. Discriminated by `platform` rather than
+/// split into amazon_/flipkart_ tables, so that every cross-platform query
+/// (due-for-scraping, history for both, candidate generation) stays a single
+/// scan instead of a UNION. Adding a third marketplace is an enum value.
+model MarketplaceListing {
+  id        String   @id @default(uuid()) @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  platform  Platform
+
+  /// ASIN on Amazon, FSN on Flipkart. Combined with `platform` this is the
+  /// idempotency key that makes re-ingesting the same URL free.
+  externalId String @map("external_id") @db.VarChar(64)
+  url        String @db.VarChar(2048)
+
+  title           String  @db.VarChar(512)
+  normalizedTitle String  @map("normalized_title") @db.VarChar(512)
+  brand           String? @db.VarChar(120)
+
+  // --- Identifiers: matching Layer 1 reads these -------------------------
+  // PA-API returns Brand / Model / PartNumber / EAN / UPC as structured
+  // fields, so on the API path these are reliable rather than regex-guessed.
+  modelNumber String? @map("model_number") @db.VarChar(120)
+  mpn         String? @db.VarChar(120)
+  ean         String? @db.VarChar(32)
+  upc         String? @db.VarChar(32)
+
+  sellerName  String?  @map("seller_name") @db.VarChar(255)
+  rating      Decimal? @db.Decimal(2, 1)
+  reviewCount Int?     @map("review_count")
+  imageUrl    String?  @map("image_url") @db.VarChar(1024)
+
+  // --- Latest observed price (denormalized from price_points) ------------
+  // Kept here so listing grids render without touching the history table.
+  // price_points remains the source of truth.
+  currency          String       @default("INR") @db.Char(3)
+  currentPriceMinor Int?         @map("current_price_minor")
+  mrpMinor          Int?         @map("mrp_minor")
+  discountPercent   Int?         @map("discount_percent")
+  availability      Availability @default(UNKNOWN)
+
+  source DataSource @default(SCRAPE)
+
+  // --- Tracking state ----------------------------------------------------
+  trackingEnabled Boolean   @default(false) @map("tracking_enabled")
+  lastScrapedAt   DateTime? @map("last_scraped_at") @db.Timestamptz(3)
+  lastSuccessAt   DateTime? @map("last_success_at") @db.Timestamptz(3)
+
+  /// Reset to 0 on success. At >= 5 the scheduler auto-pauses this listing
+  /// and raises an alert rather than hammering a dead URL forever.
+  consecutiveFailures Int @default(0) @map("consecutive_failures")
+
+  /// Platform-specific extras that do not deserve a column: Amazon sales
+  /// rank / browse nodes, Flipkart F-Assured, Plus eligibility. Validated by
+  /// a per-platform Zod schema on write, so it is typed at the boundary even
+  /// though Postgres only sees JSONB.
+  platformData Json @default("{}") @map("platform_data")
+
+  /// Unmodified specification table as fetched, before normalization. Kept
+  /// so attribute extraction can be re-run over historical rows when the
+  /// parser improves, without re-fetching.
+  rawAttributes Json @default("{}") @map("raw_attributes")
+
+  // --- Semantic search (matching Layer 3) --------------------------------
+  // Prisma has no vector type; `Unsupported` keeps the column in migrations
+  // while excluding it from the generated client. All reads/writes go
+  // through $queryRaw. HNSW index is created in a raw SQL migration.
+  embedding          Unsupported("vector(384)")?
+  embeddingModel     String?                     @map("embedding_model") @db.VarChar(64)
+  embeddingUpdatedAt DateTime?                   @map("embedding_updated_at") @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  product     Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  pricePoints PricePoint[]
+  scrapeJobs  ScrapeJob[]
+  priceAlerts PriceAlert[]
+  matchesAsA  ProductMatch[] @relation("MatchListingA")
+  matchesAsB  ProductMatch[] @relation("MatchListingB")
+
+  @@unique([platform, externalId])
+  @@index([productId])
+  @@index([ean])
+  @@index([brand, modelNumber])
+  @@map("marketplace_listings")
+}
+
+// ===========================================================================
+// Price history
+// ===========================================================================
+
+/// Append-only observation log. One row per listing per day, written only
+/// when a fetch actually succeeded.
+///
+/// NEVER updated and NEVER deleted. A missing day means "we did not observe a
+/// price", not "the price was unchanged" — the chart renders that as a real
+/// gap. Interpolating here would be fabricating data.
+///
+/// The primary key is (listing_id, captured_on) rather than a surrogate id:
+///   - it is the natural identity of an observation
+///   - it makes a duplicate-day write impossible, even under a retry storm
+///   - it includes the partition key, which Postgres requires
+///   - its btree order is exactly what every chart query scans
+///
+/// Converted to RANGE partitioning by captured_on in the initial migration.
+model PricePoint {
+  listingId String @map("listing_id") @db.Uuid
+
+  /// Partition key and daily identity (UTC date).
+  capturedOn DateTime @map("captured_on") @db.Date
+
+  /// Exact observation instant, for intra-day forensics.
+  capturedAt DateTime @map("captured_at") @db.Timestamptz(3)
+
+  currency        String       @default("INR") @db.Char(3)
+  priceMinor      Int          @map("price_minor")
+  mrpMinor        Int?         @map("mrp_minor")
+  discountPercent Int?         @map("discount_percent")
+  availability    Availability @default(UNKNOWN)
+  source          DataSource
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@id([listingId, capturedOn])
+  @@map("price_points")
+}
+
+// ===========================================================================
+// Matching
+// ===========================================================================
+
+/// A scored cross-platform pair. Listing IDs are stored in a canonical order
+/// (A < B as text) so the unique constraint dedupes regardless of which
+/// direction the pipeline ran.
+///
+/// The three per-layer sub-scores are stored alongside the blended
+/// confidence on purpose: when a match turns out to be wrong you need to see
+/// WHICH layer was fooled, otherwise weight tuning is guesswork.
+model ProductMatch {
+  id         String @id @default(uuid()) @db.Uuid
+  listingAId String @map("listing_a_id") @db.Uuid
+  listingBId String @map("listing_b_id") @db.Uuid
+
+  /// Blended score: 0.40*identifier + 0.30*attribute + 0.30*semantic.
+  confidence      Decimal @db.Decimal(5, 4)
+  identifierScore Decimal @map("identifier_score") @db.Decimal(5, 4)
+  attributeScore  Decimal @map("attribute_score") @db.Decimal(5, 4)
+  semanticScore   Decimal @map("semantic_score") @db.Decimal(5, 4)
+
+  status MatchStatus
+
+  /// Set when a hard veto overrode the score (brand mismatch, storage
+  /// mismatch, accessory-vs-device, renewed-vs-new, price ratio > 3x).
+  vetoReason String?   @map("veto_reason") @db.VarChar(120)
+  matchedBy  MatchedBy @default(PIPELINE) @map("matched_by")
+
+  /// Which build of the matching pipeline produced this row. Without it you
+  /// cannot tell which stored confidences are still comparable after the
+  /// weights or the embedding model change.
+  pipelineVersion String  @map("pipeline_version") @db.VarChar(32)
+  embeddingModel  String? @map("embedding_model") @db.VarChar(64)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  listingA MarketplaceListing @relation("MatchListingA", fields: [listingAId], references: [id], onDelete: Cascade)
+  listingB MarketplaceListing @relation("MatchListingB", fields: [listingBId], references: [id], onDelete: Cascade)
+  reviews  MatchReview[]
+
+  @@unique([listingAId, listingBId])
+  @@index([listingAId])
+  @@index([listingBId])
+  @@map("product_matches")
+}
+
+/// Audit row per human decision on a match. Kept separate from
+/// product_matches so the decision history survives re-scoring, and so the
+/// confirmed/rejected set can be exported as the golden test set that Phase 9
+/// tunes the layer weights against.
+model MatchReview {
+  id         String         @id @default(uuid()) @db.Uuid
+  matchId    String         @map("match_id") @db.Uuid
+  reviewerId String         @map("reviewer_id") @db.Uuid
+  decision   ReviewDecision
+
+  /// Confidence at the moment of review, snapshotted because the match row
+  /// may be re-scored later.
+  previousConfidence Decimal @map("previous_confidence") @db.Decimal(5, 4)
+  note               String? @db.VarChar(1000)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  match    ProductMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  reviewer User         @relation(fields: [reviewerId], references: [id], onDelete: Restrict)
+
+  @@index([matchId, createdAt])
+  @@index([reviewerId])
+  @@map("match_reviews")
+}
+
+// ===========================================================================
+// User tracking + alerts
+// ===========================================================================
+
+model TrackedProduct {
+  id        String @id @default(uuid()) @db.Uuid
+  userId    String @map("user_id") @db.Uuid
+  productId String @map("product_id") @db.Uuid
+
+  notifyBelowMinor Int? @map("notify_below_minor")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([productId])
+  @@map("tracked_products")
+}
+
+model PriceAlert {
+  id        String @id @default(uuid()) @db.Uuid
+  userId    String @map("user_id") @db.Uuid
+  listingId String @map("listing_id") @db.Uuid
+
+  thresholdMinor  Int         @map("threshold_minor")
+  status          AlertStatus @default(ACTIVE)
+  lastTriggeredAt DateTime?   @map("last_triggered_at") @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user    User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+  @@index([listingId, status])
+  @@map("price_alerts")
+}
+
+// ===========================================================================
+// Operations
+// ===========================================================================
+
+/// One row per fetch attempt — including failures. This is the scraper-health
+/// dashboard and the only way to answer "when did Amazon start blocking us,
+/// and on which strategy".
+///
+/// listing_id is nullable and ON DELETE SET NULL so that operational history
+/// outlives the listing it referred to.
+model ScrapeJob {
+  id         String   @id @default(uuid()) @db.Uuid
+  listingId  String?  @map("listing_id") @db.Uuid
+  platform   Platform
+  queueJobId String?  @map("queue_job_id") @db.VarChar(120)
+
+  status   ScrapeJobStatus @default(QUEUED)
+  strategy FetchStrategy
+  attempt  Int             @default(1)
+
+  httpStatus   Int?    @map("http_status")
+  durationMs   Int?    @map("duration_ms")
+  errorCode    String? @map("error_code") @db.VarChar(64)
+  errorMessage String? @map("error_message") @db.VarChar(2000)
+  proxyRegion  String? @map("proxy_region") @db.VarChar(32)
+
+  startedAt  DateTime? @map("started_at") @db.Timestamptz(3)
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  listing MarketplaceListing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+
+  @@index([listingId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([platform, createdAt(sort: Desc)])
+  @@map("scrape_jobs")
+}

@@ -1,0 +1,31 @@
+# Never ship these into a build context.
+#
+# node_modules is the big one: copying a 1.4 GB host directory into the
+# context makes every build slow AND wrong — the host's binaries are compiled
+# for the host platform, so a Windows-installed onnxruntime or sharp would be
+# copied into a Linux image and fail at load.
+node_modules
+**/node_modules
+
+# Build output — regenerated inside the image.
+dist
+.next
+**/dist
+**/.next
+*.tsbuildinfo
+**/.tsbuildinfo
+
+# SECRETS. .env.example is intentionally NOT excluded; the real ones are.
+.env
+.env.local
+.env.*.local
+
+# Local-only
+.git
+.github
+docs
+coverage
+test-results
+playwright-report
+chart-*.png
+*.log
