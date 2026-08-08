@@ -45,6 +45,28 @@ export const envSchema = z.object({
 
   REDIS_URL: urlWithProtocol(['redis:', 'rediss:'], 'Redis'),
 
+  /**
+   * Host the queue consumers inside the API process.
+   *
+   * Off by default, because a dedicated worker is the correct production
+   * shape: scraping is slow and memory-hungry and should not share an event
+   * loop with request handling.
+   *
+   * Turn it on when there is only one service to deploy. Without it, an API
+   * deployed alone accepts products and enqueues jobs that nothing ever
+   * consumes, and every product sits at "Fetching details" forever.
+   */
+  RUN_WORKERS_IN_API: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+
+  /**
+   * Concurrent scrapes when co-hosted. Must stay at 1 on a small instance —
+   * a Playwright fallback context costs 300-500 MB and would evict the API.
+   */
+  API_SCRAPE_CONCURRENCY: z.coerce.number().int().positive().max(4).default(1),
+
   LOG_LEVEL: z
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
     .default('info'),

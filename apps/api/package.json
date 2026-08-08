@@ -17,6 +17,7 @@
     "@pricetrail/database": "workspace:*",
     "@pricetrail/marketplace": "workspace:*",
     "@pricetrail/queue": "workspace:*",
+    "@pricetrail/worker": "workspace:*",
     "compression": "^1.8.1",
     "helmet": "^8.1.0",
     "ioredis": "^5.8.1",

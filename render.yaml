@@ -59,6 +59,21 @@ services:
       - key: RATE_LIMIT_MAX_REQUESTS
         value: "120"
 
+      # Host the queue consumers inside this process.
+      #
+      # "true" is correct when the paid worker service below is NOT deployed.
+      # Without it the API enqueues scrape jobs that nothing consumes, and
+      # every product sits at "Fetching details" forever.
+      #
+      # Flip to "false" once pricetrail-worker is running, so scraping stops
+      # competing with request handling for this instance's event loop.
+      - key: RUN_WORKERS_IN_API
+        value: "true"
+      # Never above 1 here. A Playwright fallback context costs 300-500 MB and
+      # would evict the API from a free instance's 512 MB.
+      - key: API_SCRAPE_CONCURRENCY
+        value: "1"
+
       # --- prompted at deploy time -------------------------------------------
       - key: DATABASE_URL # Supabase POOLER, port 6543, ?pgbouncer=true&connection_limit=1
         sync: false

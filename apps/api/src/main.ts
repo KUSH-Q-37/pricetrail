@@ -8,9 +8,12 @@ import compression from 'compression';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
 
+import { startWorkerRuntime } from '@pricetrail/worker';
+
 import { AppModule } from './app.module';
 import { correlationIdMiddleware } from './common/middleware/correlation-id.middleware';
 import { AppConfigService } from './config/app-config.service';
+import { PrismaService } from './infra/prisma/prisma.service';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -101,6 +104,43 @@ async function bootstrap(): Promise<void> {
     `API listening on port ${config.port} [env=${config.nodeEnv}] ` +
       `[docs=${config.swaggerEnabled ? '/api/docs' : 'disabled'}]`,
   );
+
+  // --- co-hosted workers --------------------------------------------------
+  // Started after listen() so a slow Redis handshake or ONNX model load can
+  // never delay the port opening — the platform health check must be able to
+  // succeed while the queue consumers are still warming up.
+  //
+  // Sharing this process is a real trade-off: a scrape competes with request
+  // handling for one event loop, and the embedding model's memory is charged
+  // to the API. Concurrency is capped at 1 for that reason. Move to a
+  // dedicated worker service and set RUN_WORKERS_IN_API=false when traffic
+  // justifies it — the runtime is the same code either way.
+  if (config.runWorkersInApi) {
+    try {
+      const runtime = await startWorkerRuntime({
+        redisUrl: config.redisUrl,
+        scrapeConcurrency: config.apiScrapeConcurrency,
+        // Reuse the API's pool rather than opening a second one; a free
+        // Postgres tier counts connections.
+        prisma: app.get(PrismaService),
+        logger: {
+          info: (message, meta) => logger.log({ ...meta }, message),
+          warn: (message, meta) => logger.warn({ ...meta }, message),
+          error: (message, meta) => logger.error({ ...meta }, message),
+        },
+      });
+
+      process.on('SIGTERM', () => void runtime.stop());
+    } catch (error: unknown) {
+      // A queue that will not start must not take the API down with it.
+      // Reading existing price history stays available; only new fetches
+      // stall, which is far better than a total outage.
+      logger.error(
+        { error: String(error) },
+        'co-hosted workers failed to start; API continues without them',
+      );
+    }
+  }
 }
 
 void bootstrap();

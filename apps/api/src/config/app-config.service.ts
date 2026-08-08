@@ -43,6 +43,15 @@ export class AppConfigService {
     return this.get('REDIS_URL');
   }
 
+  /** See env.schema.ts — single-service deployments host the workers here. */
+  get runWorkersInApi(): boolean {
+    return this.get('RUN_WORKERS_IN_API');
+  }
+
+  get apiScrapeConcurrency(): number {
+    return this.get('API_SCRAPE_CONCURRENCY');
+  }
+
   get logLevel(): Env['LOG_LEVEL'] {
     return this.get('LOG_LEVEL');
   }
