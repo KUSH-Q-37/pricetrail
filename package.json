@@ -5,7 +5,8 @@
   "description": "Amazon + Flipkart daily price tracking and history charts",
   "packageManager": "pnpm@11.20.0",
   "engines": {
-    "node": ">=20.11.0"
+    "node": ">=20.11.0 <25",
+    "pnpm": ">=10"
   },
   "scripts": {
     "build": "pnpm build:packages && pnpm build:apps",
@@ -34,4 +35,3 @@
     "vitest": "^4.1.10"
   }
 }
-

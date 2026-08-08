@@ -27,7 +27,13 @@ services:
     # `pnpm build` builds every workspace package AND both apps. `prisma
     # generate` must run before it — the generated client does not exist in the
     # repo (it is gitignored) and nothing compiles without it.
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @pricetrail/database generate && pnpm build
+    # `npm i -g pnpm`, NOT `corepack enable`.
+    #
+    # corepack installs its shim by symlinking into /usr/bin, which is
+    # read-only on Render's builders — the build dies with
+    # "EROFS: read-only file system, unlink '/usr/bin/pnpm'".
+    # A global npm install writes to a path the build user owns.
+    buildCommand: npm i -g pnpm@11.20.0 && pnpm install --frozen-lockfile && pnpm --filter @pricetrail/database generate && pnpm build
     startCommand: node apps/api/dist/main.js
 
     healthCheckPath: /health/live
@@ -83,7 +89,13 @@ services:
     plan: starter
     branch: main
 
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @pricetrail/database generate && pnpm build
+    # `npm i -g pnpm`, NOT `corepack enable`.
+    #
+    # corepack installs its shim by symlinking into /usr/bin, which is
+    # read-only on Render's builders — the build dies with
+    # "EROFS: read-only file system, unlink '/usr/bin/pnpm'".
+    # A global npm install writes to a path the build user owns.
+    buildCommand: npm i -g pnpm@11.20.0 && pnpm install --frozen-lockfile && pnpm --filter @pricetrail/database generate && pnpm build
     startCommand: node apps/worker/dist/main.js
 
     envVars:
