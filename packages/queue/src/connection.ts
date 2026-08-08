@@ -32,12 +32,41 @@ export function createRedisConnection(url: string, overrides: RedisOptions = {})
  *
  * Checked at startup so a misconfigured deployment fails loudly instead.
  */
-export async function assertQueueSafeRedis(connection: Redis): Promise<void> {
-  const config = await connection.config('GET', 'maxmemory-policy');
-  // Reply is a flat [key, value] array.
-  const policy = Array.isArray(config) ? String(config[1]) : undefined;
+export async function assertQueueSafeRedis(
+  connection: Redis,
+  onWarn: (message: string) => void = (m) => console.warn(m),
+): Promise<void> {
+  let policy: string | undefined;
 
-  if (policy && policy !== 'noeviction') {
+  try {
+    // Reply is a flat [key, value] array on a self-hosted server.
+    const config = await connection.config('GET', 'maxmemory-policy');
+    if (Array.isArray(config) && config.length >= 2 && config[1] != null) {
+      policy = String(config[1]);
+    }
+  } catch {
+    // Some managed providers reject CONFIG outright.
+    policy = undefined;
+  }
+
+  // Managed Redis (Upstash returns an empty array; others reject the command)
+  // does not expose CONFIG. That is NOT a failure — Upstash in particular
+  // rejects writes at the memory limit rather than evicting, which is the
+  // behaviour BullMQ needs.
+  //
+  // Treating "cannot verify" as "misconfigured" is what the first version of
+  // this function did, and it made the API refuse to start on Upstash with a
+  // message blaming an eviction policy the provider never reported.
+  if (policy === undefined) {
+    onWarn(
+      'Could not read maxmemory-policy (managed Redis often hides CONFIG). ' +
+        'Ensure eviction is DISABLED for this database — BullMQ stores job ' +
+        'state in ordinary keys and any eviction policy silently drops jobs.',
+    );
+    return;
+  }
+
+  if (policy !== 'noeviction') {
     throw new Error(
       `Redis maxmemory-policy is "${policy}" but BullMQ requires "noeviction". ` +
         `Any other policy lets Redis silently evict job state under memory pressure, ` +
