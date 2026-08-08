@@ -658,3 +658,71 @@ and fixable.
 `WHERE captured_on >= $from` prunes only the past. `WHERE captured_on BETWEEN
 $from AND $to` prunes both ends. The Phase 3 history endpoint must send both
 bounds, even when `$to` is today.
+
+---
+
+## 9. Amendment made during deployment — the worker is a function, not only a process
+
+**Status: supersedes the strict process separation implied by §2.**
+
+Phase 1 specified the API and the worker as separate deployables, for reasons
+that remain correct: scraping is slow and memory-hungry, its failure modes are
+unrelated to request handling, and the two scale on different axes. That is
+still the production target and `apps/worker` is still its own deployable.
+
+What Phase 1 did not account for is a deployment where **only one service can
+exist**. On a free hosting tier the API deploys and the worker does not, and
+the result is not degraded — it is silently broken. The API accepts products
+and enqueues scrape jobs that nothing consumes, so every product stays at
+`PENDING` forever while the UI shows "Fetching details". Nothing in the logs
+reports an error, because no component failed; the consumer was simply absent.
+The only remedy available to the operator was to run the worker by hand on a
+laptop, which is not an operational model.
+
+**The change.** The runtime moved out of `apps/worker/src/main.ts` into
+`apps/worker/src/runtime.ts`, exported as `startWorkerRuntime()`. It has two
+callers:
+
+- `apps/worker/src/main.ts` — the standalone process. Now only a signal
+  handler around the runtime.
+- `apps/api/src/main.ts` — starts the same code when `RUN_WORKERS_IN_API=true`.
+
+Both run *identical* consumer code. The env var selects topology, not
+behaviour, so moving to a dedicated worker later is a configuration change
+with no code path that was never exercised.
+
+### 9.1 What co-hosting costs
+
+Real, and the reason it is off by default:
+
+- **One event loop.** A scrape competes with request handling. Concurrency is
+  capped at 1 when embedded (`API_SCRAPE_CONCURRENCY`, max 4).
+- **Shared memory.** The ONNX embedding model (~130 MB) is charged to the API.
+  On a 512 MB instance a Playwright fallback context (300-500 MB) would evict
+  it, which is exactly why concurrency must stay at 1.
+- **Shared blast radius.** An OOM in a scrape takes request serving with it.
+
+### 9.2 Constraints the implementation must honour
+
+- **Start after `listen()`.** A slow Redis handshake or model load must never
+  delay the port opening, or the platform's health check fails the deploy
+  before the queue has finished warming up.
+- **Never fatal.** Runtime startup is wrapped: if Redis is unreachable the API
+  logs and continues. Reading existing price history stays available; only new
+  fetches stall. A queue that will not start must not cause a total outage.
+- **Borrow, do not open.** The runtime accepts the caller's `PrismaClient` and
+  disconnects it on shutdown *only if it created it*. A free Postgres tier
+  counts connections, and disconnecting a borrowed client would take the API's
+  database access down with it.
+
+### 9.3 Build-order consequence
+
+`apps/api` now imports `@pricetrail/worker`, so `build:apps` builds the worker
+first. Reversed, `tsc` cannot resolve the types and the API build fails.
+
+### 9.4 Remaining gap
+
+Free instances sleep after ~15 minutes idle, and a sleeping process runs no
+cron. The 02:00 daily sweep is registered in Redis and fires when the service
+is awake, so on a free tier it needs an external pinger to guarantee it. A
+paid always-on worker removes this entirely and is the correct end state.
