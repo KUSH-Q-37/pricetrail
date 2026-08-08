@@ -81,19 +81,17 @@ test.describe('price history chart', () => {
     await expect(canvas).toBeVisible();
   });
 
-  test('the table view exposes every value without hovering', async ({ page }) => {
-    // Required, not optional: a tooltip must never be the only way to read a
-    // value, and it is the relief channel for the light-mode contrast band.
+  test('current prices are readable without hovering the chart', async ({ page }) => {
+    // The table view was removed, so the direct labels are now the *only*
+    // non-hover way to read a value. A tooltip must never be the sole channel
+    // — a keyboard or touch user cannot produce one. If these labels ever
+    // disappear, the chart becomes unreadable for them and this test fails.
     await page.goto('/compare');
     await expect(page.locator('canvas').first()).toBeVisible({ timeout: 20_000 });
 
-    await page.getByRole('button', { name: 'Table' }).click();
-
-    const table = page.getByRole('table');
-    await expect(table).toBeVisible();
-    await expect(table.locator('tbody tr').first()).toBeVisible();
-    // Gap days are stated explicitly rather than omitted from the table.
-    await expect(table).toContainText('₹');
+    const label = page.locator('p.tabular-price').first();
+    await expect(label).toBeVisible();
+    await expect(label).toContainText('₹');
   });
 
   test('platform toggles hide and restore a series', async ({ page }) => {

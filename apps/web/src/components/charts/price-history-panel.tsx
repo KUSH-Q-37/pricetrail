@@ -1,10 +1,8 @@
 'use client';
 
-import { AlertTriangle, LineChart as LineChartIcon, Table2 } from 'lucide-react';
-import { useState } from 'react';
+import { AlertTriangle, CalendarClock, LineChart as LineChartIcon } from 'lucide-react';
 
 import { PriceHistoryChart } from './price-history-chart';
-import { PriceTableView } from './price-table-view';
 import { PLATFORM_LABEL } from './chart-theme';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,7 +16,6 @@ import { cn, formatPrice } from '@/lib/utils';
 export function PriceHistoryPanel({ productId }: { productId: string }) {
   const { chartRange, setChartRange, showAmazon, showFlipkart, togglePlatform } =
     useUiStore();
-  const [view, setView] = useState<'chart' | 'table'>('chart');
 
   const { data, isPending, isError, error, refetch, isFetching } = usePriceHistory(
     productId,
@@ -29,6 +26,15 @@ export function PriceHistoryPanel({ productId }: { productId: string }) {
   const totalGaps =
     data?.series.reduce((sum, entry) => sum + entry.stats.missingDays, 0) ?? 0;
   const hasData = (data?.series ?? []).some((entry) => entry.stats.observedDays > 0);
+
+  // How much history actually exists, regardless of the range selected. A user
+  // who picks 1.5Y on a product we started tracking last week sees a nearly
+  // empty chart and reasonably assumes it is broken. Saying how much we have
+  // is the difference between "no data" and "not yet".
+  const observedDays = Math.max(
+    0,
+    ...(data?.series ?? []).map((entry) => entry.stats.observedDays),
+  );
 
   return (
     <Card>
@@ -64,34 +70,6 @@ export function PriceHistoryPanel({ productId }: { productId: string }) {
                 </button>
               );
             })}
-
-            <div
-              role="group"
-              aria-label="View"
-              className="ml-1 inline-flex rounded-lg border border-border p-0.5"
-            >
-              {(
-                [
-                  ['chart', LineChartIcon, 'Chart'],
-                  ['table', Table2, 'Table'],
-                ] as const
-              ).map(([value, Icon, label]) => (
-                <button
-                  key={value}
-                  onClick={() => setView(value)}
-                  aria-label={label}
-                  aria-pressed={view === value}
-                  className={cn(
-                    'grid size-7 place-items-center rounded-md transition-colors',
-                    view === value
-                      ? 'bg-accent text-accent-foreground'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  <Icon className="size-3.5" aria-hidden="true" />
-                </button>
-              ))}
-            </div>
           </div>
         </div>
 
@@ -179,17 +157,11 @@ export function PriceHistoryPanel({ productId }: { productId: string }) {
                 ))}
             </div>
 
-            {view === 'chart' ? (
-              <PriceHistoryChart
-                series={data.series}
-                visible={visible}
-                loading={isFetching}
-              />
-            ) : (
-              <PriceTableView
-                series={data.series.filter((entry) => visible[entry.platform])}
-              />
-            )}
+            <PriceHistoryChart
+              series={data.series}
+              visible={visible}
+              loading={isFetching}
+            />
 
             {/* Gaps are stated, not hidden. A break in the line is a fact
                 about our data collection, and the reader is told so. */}
@@ -200,6 +172,18 @@ export function PriceHistoryPanel({ productId }: { productId: string }) {
                   {totalGaps} day{totalGaps === 1 ? '' : 's'} with no recorded
                   observation in this range. Breaks in the line are real gaps —
                   we do not estimate prices we did not observe.
+                </span>
+              </p>
+            ) : null}
+
+            {observedDays > 0 && observedDays < 30 ? (
+              <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                <CalendarClock className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                <span>
+                  {observedDays} day{observedDays === 1 ? '' : 's'} of history so
+                  far. Neither marketplace publishes past prices, so this chart
+                  grows one observation per day from the moment you added the
+                  product — longer ranges fill in over time.
                 </span>
               </p>
             ) : null}
