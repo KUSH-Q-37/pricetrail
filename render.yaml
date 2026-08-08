@@ -1,0 +1,119 @@
+# Render Blueprint.
+#
+# Render reads this file when you connect the repo and provisions BOTH services
+# with the correct build and start commands already filled in — no manual
+# configuration in the dashboard.
+#
+#   render.com → New → Blueprint → connect KUSH-Q-37/pricetrail
+#
+# Values marked `sync: false` are secrets: Render prompts for them once during
+# setup and never stores them in this file. That is why none of your connection
+# strings appear here.
+#
+# Free-tier caveat: Render spins web services down after 15 minutes idle, so the
+# first request after a quiet period takes ~30s. The WORKER must be a paid
+# background service — a free instance is suspended and the daily sweep would
+# never run.
+
+services:
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: pricetrail-api
+    runtime: node
+    region: singapore # closest Render region to India
+    plan: free
+    branch: main
+
+    # `pnpm build` builds every workspace package AND both apps. `prisma
+    # generate` must run before it — the generated client does not exist in the
+    # repo (it is gitignored) and nothing compiles without it.
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @pricetrail/database generate && pnpm build
+    startCommand: node apps/api/dist/main.js
+
+    healthCheckPath: /health/live
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TZ
+        value: UTC
+      - key: APP_TIMEZONE
+        value: Asia/Kolkata
+      - key: LOG_LEVEL
+        value: info
+      # The OpenAPI document is a complete map of the attack surface.
+      - key: SWAGGER_ENABLED
+        value: "false"
+      # local-dev lets the API mint its own tokens; the env schema refuses to
+      # boot if it is combined with NODE_ENV=production.
+      - key: AUTH_MODE
+        value: supabase
+      - key: RATE_LIMIT_WINDOW_SECONDS
+        value: "60"
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: "120"
+
+      # --- prompted at deploy time -------------------------------------------
+      - key: DATABASE_URL # Supabase POOLER, port 6543, ?pgbouncer=true&connection_limit=1
+        sync: false
+      - key: DIRECT_URL # Supabase DIRECT, port 5432 — migrations only
+        sync: false
+      - key: REDIS_URL # Upstash rediss:// (TLS)
+        sync: false
+      - key: SUPABASE_URL # https://<project-ref>.supabase.co
+        sync: false
+      - key: CORS_ORIGINS # your Vercel URL, exactly, no trailing slash
+        sync: false
+
+      # --- add once Amazon Associates approves you ---------------------------
+      - key: PAAPI_ACCESS_KEY
+        sync: false
+      - key: PAAPI_SECRET_KEY
+        sync: false
+      - key: PAAPI_PARTNER_TAG
+        sync: false
+
+  # ---------------------------------------------------------------------------
+  - type: worker
+    name: pricetrail-worker
+    runtime: node
+    region: singapore
+    # NOT free: Render suspends free instances, and a suspended worker means the
+    # 02:00 sweep silently never runs and no prices are ever recorded.
+    plan: starter
+    branch: main
+
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @pricetrail/database generate && pnpm build
+    startCommand: node apps/worker/dist/main.js
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TZ
+        value: UTC
+      - key: APP_TIMEZONE
+        value: Asia/Kolkata
+      - key: LOG_LEVEL
+        value: info
+      # Each Playwright context costs 300-500 MB. This number times the browser
+      # fallback rate is the real memory ceiling — raise it only after watching
+      # actual usage.
+      - key: SCRAPE_CONCURRENCY
+        value: "2"
+      # Spread the daily fetches over 6 hours. Enqueueing everything at once is
+      # indistinguishable from an attack and gets the IP range blocked.
+      - key: SWEEP_WINDOW_MINUTES
+        value: "360"
+
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: PAAPI_ACCESS_KEY
+        sync: false
+      - key: PAAPI_SECRET_KEY
+        sync: false
+      - key: PAAPI_PARTNER_TAG
+        sync: false
