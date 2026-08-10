@@ -14,14 +14,14 @@ interface PublicStats {
 }
 
 /**
- * Below this many accounts, the user count is not shown at all.
+ * Minimum accounts before the user count is shown.
  *
- * "Join 2 users" is worse than saying nothing: an empty room is evidence
- * against the product, and this is the one metric that becomes more persuasive
- * by being withheld until it is real. Above the floor it appears on its own,
- * with no code change.
+ * Set to 0 at the owner's request: the count is always displayed. The knob is
+ * kept rather than deleted because the reason for it still holds — a small
+ * number here reads as evidence against the product, and raising this is the
+ * one-line way to hide it again if that becomes a concern.
  */
-const USER_COUNT_FLOOR = 50;
+const USER_COUNT_FLOOR = 0;
 
 async function fetchStats(): Promise<PublicStats | null> {
   const base = process.env['NEXT_PUBLIC_API_URL'];
@@ -86,7 +86,10 @@ export async function LiveStats() {
           />
 
           {stats.users >= USER_COUNT_FLOOR ? (
-            <Stat value={stats.users.toLocaleString('en-IN')} label="Members" />
+            <Stat
+              value={stats.users.toLocaleString('en-IN')}
+              label={`Registered user${stats.users === 1 ? '' : 's'}`}
+            />
           ) : (
             <Stat value="2" label="Marketplaces compared" />
           )}
