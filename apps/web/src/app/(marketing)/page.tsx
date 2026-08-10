@@ -9,6 +9,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 
+import { LiveStats } from '@/components/marketing/live-stats';
 import { Reveal } from '@/components/marketing/reveal';
 import { SamplePriceChart } from '@/components/marketing/sample-price-chart';
 
@@ -159,6 +160,8 @@ export default function LandingPage() {
         </div>
         </Reveal>
       </section>
+
+      <LiveStats />
 
       {/* ---------------------------------------------------------------- */}
       <section className="border-t border-border bg-muted/20">

@@ -15,6 +15,7 @@ import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/roles.guard';
 import { HealthModule } from './modules/health/health.module';
 import { MetaModule } from './modules/meta/meta.module';
+import { StatsModule } from './modules/stats/stats.module';
 import { PricesModule } from './modules/prices/prices.module';
 import { ProductsModule } from './modules/products/products.module';
 
@@ -82,6 +83,7 @@ import { ProductsModule } from './modules/products/products.module';
     MetaModule,
     ProductsModule,
     PricesModule,
+    StatsModule,
   ],
   providers: [
     // Registered as APP_FILTER (not useGlobalFilters in main.ts) so the filter
