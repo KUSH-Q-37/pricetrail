@@ -9,6 +9,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 
+import { Reveal } from '@/components/marketing/reveal';
 import { SamplePriceChart } from '@/components/marketing/sample-price-chart';
 
 export const metadata: Metadata = {
@@ -68,9 +69,22 @@ export default function LandingPage() {
   return (
     <>
       {/* ---------------------------------------------------------------- */}
-      <section className="mx-auto w-full max-w-5xl px-4 pb-10 pt-16 sm:pt-24">
+      <section className="relative mx-auto w-full max-w-5xl overflow-hidden px-4 pb-10 pt-16 sm:pt-24">
+        {/* Decorative only. Sits behind content, ignores pointer events, and
+            stops entirely under prefers-reduced-motion. */}
+        <div
+          className="aurora -left-24 -top-16 size-[420px] bg-[var(--chart-flipkart)]"
+          aria-hidden="true"
+        />
+        <div
+          className="aurora -right-16 top-24 size-[360px] bg-[var(--chart-amazon)]"
+          style={{ animationDelay: '-9s', animationDuration: '32s' }}
+          aria-hidden="true"
+        />
+
+        <div className="relative">
         <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs text-muted-foreground">
-          <span className="size-1.5 rounded-full bg-success" aria-hidden="true" />
+          <span className="live-dot size-1.5 rounded-full bg-success" aria-hidden="true" />
           Tracking Amazon.in and Flipkart daily
         </p>
 
@@ -99,11 +113,13 @@ export default function LandingPage() {
             Sign in
           </Link>
         </div>
+        </div>
       </section>
 
       {/* ---------------------------------------------------------------- */}
       <section className="mx-auto w-full max-w-5xl px-4 pb-16">
-        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+        <Reveal>
+        <div className="lift rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
             <div>
               <h2 className="font-semibold">Apple iPhone 15 Pro (256 GB)</h2>
@@ -138,6 +154,7 @@ export default function LandingPage() {
             We show it as a gap rather than drawing a straight line through it.
           </p>
         </div>
+        </Reveal>
       </section>
 
       {/* ---------------------------------------------------------------- */}
@@ -146,7 +163,7 @@ export default function LandingPage() {
           <h2 className="text-2xl font-semibold tracking-tight">How it works</h2>
           <div className="mt-8 grid gap-6 sm:grid-cols-3">
             {STEPS.map(({ icon: Icon, title, body }, index) => (
-              <div key={title}>
+              <Reveal key={title} delay={index * 0.1}>
                 <div className="mb-3 flex items-center gap-2">
                   <span className="grid size-8 place-items-center rounded-lg bg-primary/10">
                     <Icon className="size-4 text-primary" aria-hidden="true" />
@@ -159,7 +176,7 @@ export default function LandingPage() {
                 <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                   {body}
                 </p>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -175,14 +192,14 @@ export default function LandingPage() {
         </p>
 
         <div className="mt-8 grid gap-6 sm:grid-cols-3">
-          {FEATURES.map(({ icon: Icon, title, body }) => (
-            <div key={title} className="rounded-xl border border-border p-5">
+          {FEATURES.map(({ icon: Icon, title, body }, index) => (
+            <Reveal key={title} delay={index * 0.1} className="lift rounded-xl border border-border p-5">
               <Icon className="mb-3 size-5 text-primary" aria-hidden="true" />
               <h3 className="font-medium">{title}</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                 {body}
               </p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </section>
@@ -202,7 +219,7 @@ export default function LandingPage() {
             {CATEGORIES.map((category) => (
               <li
                 key={category}
-                className="rounded-full border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground"
+                className="lift rounded-full border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground"
               >
                 {category}
               </li>

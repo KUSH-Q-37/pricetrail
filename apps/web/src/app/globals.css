@@ -214,3 +214,85 @@
     }
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Landing page motion.
+   
+   CSS, not a JS animation library, for everything below. These run on the
+   compositor, cost nothing on the main thread, and — crucially — work inside
+   the SVG chart while it stays a server component. Reaching for Framer Motion
+   there would have forced it client-side and pulled the hero visual out of the
+   server-rendered HTML.
+--------------------------------------------------------------------------- */
+
+/* Chart lines draw themselves in. dasharray is set to the path length so the
+   dash is the whole line, then the offset walks it into view. */
+@keyframes draw-line {
+  from { stroke-dashoffset: var(--dash); }
+  to   { stroke-dashoffset: 0; }
+}
+
+.chart-line {
+  stroke-dasharray: var(--dash);
+  stroke-dashoffset: var(--dash);
+  animation: draw-line 1.6s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+}
+
+/* Slow drifting colour behind the hero. Two blurred radial blobs on long,
+   offset cycles never repeat visibly, which is what keeps it from reading as
+   a loop. */
+@keyframes aurora-drift {
+  0%,  100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(6%, -4%) scale(1.12); }
+  66%       { transform: translate(-5%, 3%) scale(0.95); }
+}
+
+.aurora {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: 0.22;
+  will-change: transform;
+  animation: aurora-drift 26s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.dark .aurora { opacity: 0.3; }
+
+/* Soft pulse on the "tracking daily" dot — a heartbeat implying live data. */
+@keyframes live-pulse {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.82); }
+}
+
+.live-dot { animation: live-pulse 2.4s ease-in-out infinite; }
+
+/* Cards lift slightly toward the cursor. Small — 2px reads as responsive,
+   8px reads as a toy. */
+.lift {
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 0.25s ease;
+}
+.lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px -12px rgb(0 0 0 / 0.28);
+  border-color: color-mix(in oklab, var(--primary) 35%, var(--border));
+}
+
+/* One switch disables all of it. Required, not a nicety: the OS setting is a
+   medical accommodation, and an infinite background animation is exactly what
+   it exists to stop. */
+@media (prefers-reduced-motion: reduce) {
+  .chart-line {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .aurora,
+  .live-dot {
+    animation: none;
+  }
+  .lift:hover {
+    transform: none;
+  }
+}

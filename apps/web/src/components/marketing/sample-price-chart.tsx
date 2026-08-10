@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+
 /**
  * Illustrative price chart for the landing page.
  *
@@ -74,6 +76,28 @@ function toSegments(series: Array<number | null>): string[] {
 
 const gridLines = [0, 0.25, 0.5, 0.75, 1].map((t) => MIN + (MAX - MIN) * t);
 
+/**
+ * Approximate rendered length of a path, by summing its segment distances.
+ *
+ * The draw-in animation needs stroke-dasharray to equal the line's length, and
+ * getTotalLength() is a DOM call this server component cannot make. Summing
+ * straight segments is exact here, because these paths are polylines.
+ */
+function pathLength(d: string): number {
+  const points = [...d.matchAll(/[ML] ([\d.]+),([\d.]+)/g)].map((m) => [
+    Number(m[1]),
+    Number(m[2]),
+  ]);
+
+  let total = 0;
+  for (let i = 1; i < points.length; i += 1) {
+    const [x1, y1] = points[i - 1] as [number, number];
+    const [x2, y2] = points[i] as [number, number];
+    total += Math.hypot(x2 - x1, y2 - y1);
+  }
+  return Math.ceil(total);
+}
+
 export function SamplePriceChart() {
   return (
     <figure className="m-0">
@@ -121,6 +145,9 @@ export function SamplePriceChart() {
           </text>
         ))}
 
+        {/* Offset by 220ms so these read as two lines being drawn rather than
+            one thick one. Flipkart leads because it has no gap, so the eye
+            follows an unbroken stroke first. */}
         {toSegments(FLIPKART).map((d, i) => (
           <path
             key={`fk-${i}`}
@@ -130,6 +157,10 @@ export function SamplePriceChart() {
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
+            className="chart-line"
+            style={
+              { '--dash': pathLength(d), animationDelay: `${i * 0.25}s` } as CSSProperties
+            }
           />
         ))}
 
@@ -142,6 +173,13 @@ export function SamplePriceChart() {
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
+            className="chart-line"
+            style={
+              {
+                '--dash': pathLength(d),
+                animationDelay: `${0.22 + i * 0.25}s`,
+              } as CSSProperties
+            }
           />
         ))}
       </svg>
