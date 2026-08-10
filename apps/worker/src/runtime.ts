@@ -79,6 +79,29 @@ export interface WorkerRuntime {
   stop(): Promise<void>;
 }
 
+/**
+ * Redis command budget.
+ *
+ * BullMQ is chatty when idle. Each worker re-issues a blocking read every
+ * `drainDelay` seconds and runs a stalled-job check every `stalledInterval`
+ * ms, per queue. At the defaults (5s / 30s) four queues cost roughly 250,000
+ * Redis commands a day doing nothing at all — which exhausted a 500,000/month
+ * free tier in two days and took the API down with it, because a Redis that
+ * refuses AUTH is indistinguishable from a Redis that is gone.
+ *
+ * This workload is one sweep a day plus occasional user-triggered ingests.
+ * Latency of up to a minute on job pickup is invisible for a price tracker;
+ * running out of Redis is not. These values cut idle traffic by ~90%.
+ *
+ * Raise them only alongside a paid Redis plan.
+ */
+const POLL_BUDGET = {
+  /** Seconds a blocking read waits before re-issuing. Default 5. */
+  drainDelay: Number(process.env['QUEUE_DRAIN_DELAY'] ?? 60),
+  /** Ms between stalled-job checks. Default 30_000. */
+  stalledInterval: Number(process.env['QUEUE_STALLED_INTERVAL'] ?? 300_000),
+} as const;
+
 export async function startWorkerRuntime(
   options: WorkerRuntimeOptions = {},
 ): Promise<WorkerRuntime> {
@@ -149,7 +172,7 @@ export async function startWorkerRuntime(
 
         return result;
       },
-      { connection, concurrency: scrapeConcurrency },
+      { connection, concurrency: scrapeConcurrency, ...POLL_BUDGET },
     ),
   );
 
@@ -172,7 +195,7 @@ export async function startWorkerRuntime(
 
         return result;
       },
-      { connection, concurrency: 1 },
+      { connection, concurrency: 1, ...POLL_BUDGET },
     ),
   );
 
@@ -181,7 +204,7 @@ export async function startWorkerRuntime(
     new Worker<MatchListingJob>(
       QUEUE.match,
       async (job: Job<MatchListingJob>) => matchListing(prisma, embeddings, job.data.listingId),
-      { connection, concurrency: 2 },
+      { connection, concurrency: 2, ...POLL_BUDGET },
     ),
   );
 
@@ -214,7 +237,7 @@ export async function startWorkerRuntime(
             throw new Error(`Unknown maintenance task: ${String(job.data.task)}`);
         }
       },
-      { connection, concurrency: 1 },
+      { connection, concurrency: 1, ...POLL_BUDGET },
     ),
   );
 
