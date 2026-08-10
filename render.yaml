@@ -74,6 +74,23 @@ services:
       - key: API_SCRAPE_CONCURRENCY
         value: "1"
 
+      # Minutes over which the daily sweep spreads its fetches.
+      #
+      # The worker service below uses 360, which is right for an always-on
+      # process: enqueueing every product at once is indistinguishable from an
+      # attack and gets the IP range blocked.
+      #
+      # It is wrong when the workers are co-hosted on a free instance. Render
+      # sleeps a web service after ~15 minutes idle, and a BullMQ delayed job
+      # is only promoted while a worker is actually running — so jobs scheduled
+      # hours after the sweep are never picked up, and the product records one
+      # observation on the day it was added and nothing afterwards.
+      #
+      # 8 minutes keeps the whole sweep inside a single wake window while still
+      # spacing the requests. Raise it only when a dedicated worker is running.
+      - key: SWEEP_WINDOW_MINUTES
+        value: "8"
+
       # --- prompted at deploy time -------------------------------------------
       - key: DATABASE_URL # Supabase POOLER, port 6543, ?pgbouncer=true&connection_limit=1
         sync: false
