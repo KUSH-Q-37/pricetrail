@@ -69,7 +69,10 @@ export default function LandingPage() {
   return (
     <>
       {/* ---------------------------------------------------------------- */}
-      <section className="relative mx-auto w-full max-w-5xl overflow-hidden px-4 pb-10 pt-16 sm:pt-24">
+      {/* Full viewport height minus the sticky header, so the hero owns the
+          first screen. dvh not vh: on mobile, vh ignores the browser chrome
+          and pushes the CTAs below the fold. */}
+      <section className="relative flex min-h-[calc(100dvh-3.5rem)] w-full items-center overflow-hidden px-4 py-16">
         {/* Decorative only. Sits behind content, ignores pointer events, and
             stops entirely under prefers-reduced-motion. */}
         <div
@@ -82,13 +85,13 @@ export default function LandingPage() {
           aria-hidden="true"
         />
 
-        <div className="relative">
+        <div className="relative mx-auto w-full max-w-7xl">
         <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs text-muted-foreground">
           <span className="live-dot size-1.5 rounded-full bg-success" aria-hidden="true" />
           Tracking Amazon.in and Flipkart daily
         </p>
 
-        <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
+        <h1 className="max-w-4xl text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
           Is that discount real?
         </h1>
 
@@ -117,7 +120,7 @@ export default function LandingPage() {
       </section>
 
       {/* ---------------------------------------------------------------- */}
-      <section className="mx-auto w-full max-w-5xl px-4 pb-16">
+      <section className="mx-auto w-full max-w-7xl px-4 pb-16">
         <Reveal>
         <div className="lift rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
@@ -159,7 +162,7 @@ export default function LandingPage() {
 
       {/* ---------------------------------------------------------------- */}
       <section className="border-t border-border bg-muted/20">
-        <div className="mx-auto w-full max-w-5xl px-4 py-16">
+        <div className="mx-auto w-full max-w-7xl px-4 py-16">
           <h2 className="text-2xl font-semibold tracking-tight">How it works</h2>
           <div className="mt-8 grid gap-6 sm:grid-cols-3">
             {STEPS.map(({ icon: Icon, title, body }, index) => (
@@ -183,7 +186,7 @@ export default function LandingPage() {
       </section>
 
       {/* ---------------------------------------------------------------- */}
-      <section className="mx-auto w-full max-w-5xl px-4 py-16">
+      <section className="mx-auto w-full max-w-7xl px-4 py-16">
         <h2 className="text-2xl font-semibold tracking-tight">
           Built to be trustworthy
         </h2>
@@ -206,7 +209,7 @@ export default function LandingPage() {
 
       {/* ---------------------------------------------------------------- */}
       <section className="border-t border-border">
-        <div className="mx-auto w-full max-w-5xl px-4 py-16">
+        <div className="mx-auto w-full max-w-7xl px-4 py-16">
           <h2 className="text-2xl font-semibold tracking-tight">
             What we track
           </h2>
@@ -230,7 +233,7 @@ export default function LandingPage() {
 
       {/* ---------------------------------------------------------------- */}
       <section className="border-t border-border bg-muted/20">
-        <div className="mx-auto w-full max-w-5xl px-4 py-16 text-center">
+        <div className="mx-auto w-full max-w-7xl px-4 py-16 text-center">
           <h2 className="text-2xl font-semibold tracking-tight">
             Know the price before you pay it
           </h2>

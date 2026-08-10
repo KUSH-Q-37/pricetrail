@@ -16,7 +16,7 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur-sm">
-        <div className="mx-auto flex h-14 w-full max-w-5xl items-center gap-3 px-4">
+        <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-3 px-4">
           <Link href="/" className="flex items-center gap-2">
             <TrendingUp className="size-5 text-primary" aria-hidden="true" />
             <span className="font-semibold tracking-tight">PriceTrail</span>
@@ -43,7 +43,7 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
       <main className="flex-1">{children}</main>
 
       <footer className="border-t border-border">
-        <div className="mx-auto w-full max-w-5xl px-4 py-8 text-sm text-muted-foreground">
+        <div className="mx-auto w-full max-w-7xl px-4 py-8 text-sm text-muted-foreground">
           <p>
             PriceTrail tracks publicly listed prices on Amazon.in and
             Flipkart.com. Prices shown are observations recorded at a point in
