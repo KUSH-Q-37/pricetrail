@@ -20,6 +20,8 @@ export const QUEUE = {
   scrape: 'scrape-listing',
   embed: 'embed-listing',
   match: 'match-listing',
+  /** Finds a listing's counterpart on the opposite marketplace. */
+  discover: 'discover-counterpart',
   maintenance: 'maintenance',
 } as const;
 
@@ -58,6 +60,10 @@ export interface MatchListingJob extends BaseJob {
   listingId: string;
 }
 
+export interface DiscoverCounterpartJob extends BaseJob {
+  listingId: string;
+}
+
 export type MaintenanceTask =
   | 'daily-sweep'
   | 'ensure-partitions'
@@ -74,5 +80,6 @@ export interface JobPayloads {
   [QUEUE.scrape]: ScrapeListingJob;
   [QUEUE.embed]: EmbedListingJob;
   [QUEUE.match]: MatchListingJob;
+  [QUEUE.discover]: DiscoverCounterpartJob;
   [QUEUE.maintenance]: MaintenanceJob;
 }

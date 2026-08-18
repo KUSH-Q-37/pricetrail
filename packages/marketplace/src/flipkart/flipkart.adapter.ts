@@ -1,3 +1,5 @@
+import { searchUnavailable } from '../search';
+import type { ProductSearchResult } from '../search';
 import {
   FetchError,
   type FetchOutcome,
@@ -60,6 +62,31 @@ export class FlipkartAdapter implements MarketplaceAdapter {
       });
     }
     return this.playwright;
+  }
+
+  /**
+   * Search Flipkart for candidate products.
+   *
+   * Not implemented, and reported as unavailable rather than faked.
+   *
+   * Flipkart has no public product API. Its Affiliate API has had extended
+   * periods of closed onboarding (see flipkart.api.ts), and scraping the
+   * search-results page is a materially different proposition from scraping a
+   * product page: results are personalised, paginated, ad-injected and carry
+   * no JSON-LD, so the stable schema.org markup this adapter relies on for
+   * product pages simply is not there. Parsing it would produce candidates
+   * whose quality we could not reason about, feeding a matching engine whose
+   * entire value is that it refuses uncertain matches.
+   *
+   * Returning `available: false` lets discovery record the gap and move on,
+   * leaving the original listing tracked and shown — which is what section 26
+   * of the requirements asks for.
+   */
+  async searchProducts(_query: string, _limit = 5): Promise<ProductSearchResult> {
+    return searchUnavailable(
+      'Flipkart has no configured search source (no public API; search-page scraping is not implemented)',
+      false,
+    );
   }
 
   async fetchProduct(request: FetchRequest): Promise<FetchOutcome> {

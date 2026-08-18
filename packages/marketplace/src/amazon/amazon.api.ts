@@ -6,6 +6,8 @@ import {
 } from '../adapter';
 import { validateFetchedProduct } from '../product-data.schema';
 import type { RawFetchedProduct } from '../product-data.schema';
+import { searchUnavailable } from '../search';
+import type { ProductSearchCandidate, ProductSearchResult } from '../search';
 import { normalizeAvailability } from '../shared/availability';
 import { computeDiscountPercent } from '../shared/price';
 import { cleanText } from '../shared/text';
@@ -190,6 +192,112 @@ export class AmazonApiFetcher implements FetchStrategy {
     return outcomes;
   }
 
+  /**
+   * Find candidate ASINs by keywords, for counterpart discovery.
+   *
+   * PA-API SearchItems, sharing this class's signer and item mapping with
+   * GetItems. It is a separate operation with its own quota, and its results
+   * are ranked by Amazon's relevance, not by any notion of equivalence — so
+   * every candidate returned here is a SUGGESTION. Deciding whether one is
+   * actually the same product is the matching engine's job, and its veto rules
+   * exist precisely because search relevance will happily return a phone case
+   * for a phone query.
+   *
+   * ItemCount is capped at 10 by the API.
+   */
+  async searchProducts(query: string, limit = 5): Promise<ProductSearchResult> {
+    if (!this.config || !this.isAvailable()) {
+      // A configuration fact, not a failure: retrying changes nothing.
+      return searchUnavailable('PA-API credentials are not configured', false);
+    }
+
+    const trimmed = query.trim();
+    if (trimmed.length === 0) {
+      return searchUnavailable('empty query', false);
+    }
+
+    const path = '/paapi5/searchitems';
+    const payload = JSON.stringify({
+      Keywords: trimmed,
+      SearchIndex: 'All',
+      ItemCount: Math.min(Math.max(limit, 1), 10),
+      Resources: RESOURCES,
+      PartnerTag: this.config.partnerTag,
+      PartnerType: 'Associates',
+      Marketplace: `www.${this.host.replace(/^webservices\./, '')}`,
+    });
+
+    const signed = signRequest({
+      method: 'POST',
+      host: this.host,
+      path,
+      region: this.region,
+      service: 'ProductAdvertisingAPI',
+      target: 'com.amazon.paapi5.v1.ProductAdvertisingAPIv1.SearchItems',
+      payload,
+      accessKey: this.config.accessKey,
+      secretKey: this.config.secretKey,
+    });
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+
+    let response: Response;
+    try {
+      response = await fetch(`https://${this.host}${path}`, {
+        method: 'POST',
+        headers: signed.headers,
+        body: payload,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      // Network trouble is retryable, unlike missing credentials.
+      return searchUnavailable(
+        `PA-API search request failed: ${error instanceof Error ? error.message : 'unknown'}`,
+        true,
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!response.ok) {
+      // 404 from SearchItems means "no results", which is an answer, not a
+      // fault. A spent quota (429) is retryable later today; 401/403 means the
+      // credentials are not active — PA-API issues keys before the account
+      // qualifies to use them — and no amount of retrying fixes that.
+      if (response.status === 404) {
+        return { available: true, candidates: [] };
+      }
+      return searchUnavailable(
+        `PA-API search HTTP ${response.status}`,
+        response.status === 429 || response.status >= 500,
+      );
+    }
+
+    const body = (await response.json()) as PaapiSearchItemsResponse;
+    const candidates: ProductSearchCandidate[] = [];
+
+    for (const item of body.SearchResult?.Items ?? []) {
+      const raw = this.toRawProduct(item);
+      if (!raw.title) continue;
+
+      candidates.push({
+        externalId: raw.externalId,
+        url: raw.url,
+        title: raw.title,
+        brand: raw.brand,
+        priceMinor: raw.priceMinor,
+        imageUrl: raw.imageUrl,
+        ean: raw.ean,
+        upc: raw.upc,
+        modelNumber: raw.modelNumber,
+        mpn: raw.mpn,
+      });
+    }
+
+    return { available: true, candidates };
+  }
+
   private toRawProduct(item: PaapiItem): RawFetchedProduct {
     const listing = item.Offers?.Listings?.[0];
     const info = item.ItemInfo;
@@ -260,6 +368,10 @@ function firstDigits(
 }
 
 // --- Minimal response typings for the resources we request ------------------
+interface PaapiSearchItemsResponse {
+  SearchResult?: { Items?: PaapiItem[] };
+}
+
 interface PaapiGetItemsResponse {
   ItemsResult?: { Items?: PaapiItem[] };
   Errors?: Array<{ Code: string; Message: string }>;

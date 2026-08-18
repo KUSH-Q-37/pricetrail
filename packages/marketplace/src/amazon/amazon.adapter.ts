@@ -1,3 +1,4 @@
+import type { ProductSearchResult } from '../search';
 import {
   FetchError,
   type FetchOutcome,
@@ -65,6 +66,19 @@ export class AmazonAdapter implements MarketplaceAdapter {
       });
     }
     return this.playwright;
+  }
+
+  /**
+   * Search Amazon for candidate products, for counterpart discovery.
+   *
+   * PA-API only. There is deliberately no scraping fallback here: Amazon
+   * blocks automated access to its search pages far more aggressively than to
+   * product pages, and a blocked search would return a captcha page that
+   * parses as zero results — indistinguishable from a genuine empty result,
+   * and quietly wrong. Better to report the source as unavailable.
+   */
+  async searchProducts(query: string, limit = 5): Promise<ProductSearchResult> {
+    return this.api.searchProducts(query, limit);
   }
 
   async fetchProduct(request: FetchRequest): Promise<FetchOutcome> {

@@ -1,3 +1,4 @@
+import { mergeIntoCanonicalProduct } from './merge-products';
 import { PrismaClient } from '@pricetrail/database';
 import { buildEmbeddingText, type EmbeddingProvider } from '@pricetrail/embeddings';
 import { matchProducts, type MatchInput } from '@pricetrail/matching';
@@ -10,6 +11,8 @@ export interface MatchRunResult {
   autoConfirmed: number;
   needsReview: number;
   rejected: number;
+  /** Pairs brought under one canonical product by this run. */
+  merged: number;
 }
 
 /**
@@ -32,6 +35,7 @@ export async function matchListing(
     autoConfirmed: 0,
     needsReview: 0,
     rejected: 0,
+    merged: 0,
   };
 
   const listing = await prisma.marketplaceListing.findUnique({
@@ -137,6 +141,18 @@ export async function matchListing(
     });
 
     result.scored++;
+
+    // A confirmed match is only useful if the two listings end up under one
+    // canonical product — the history endpoint reads listings through their
+    // product, so an unmerged pair scores correctly and still renders as two
+    // unrelated charts. Deliberately not done for NEEDS_REVIEW: an uncertain
+    // pair stays separate, because presenting two different products as one is
+    // worse than showing no comparison.
+    if (verdict.decision === 'AUTO_CONFIRMED') {
+      const merge = await mergeIntoCanonicalProduct(prisma, listingAId, listingBId);
+      if (merge.merged) result.merged += 1;
+    }
+
     if (verdict.decision === 'AUTO_CONFIRMED') result.autoConfirmed++;
     else if (verdict.decision === 'NEEDS_REVIEW') result.needsReview++;
     else result.rejected++;

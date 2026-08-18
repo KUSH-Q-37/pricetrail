@@ -31,6 +31,7 @@ import {
   Worker,
   assertQueueSafeRedis,
   createRedisConnection,
+  type DiscoverCounterpartJob,
   type EmbedListingJob,
   type Job,
   type MaintenanceJob,
@@ -39,6 +40,7 @@ import {
 } from '@pricetrail/queue';
 
 import { applyRetention } from './jobs/apply-retention';
+import { discoverCounterpart } from './jobs/discover-counterpart';
 import { embedMissingListings } from './jobs/embed-listings';
 import { planDailySweep } from './jobs/daily-sweep';
 import { matchListing } from './jobs/match-listings';
@@ -137,6 +139,22 @@ export async function startWorkerRuntime(
       onStrategyFallback: (info) => logger.warn('fetch strategy escalated', { ...info }),
     }),
     FLIPKART: new FlipkartAdapter({
+      // Affiliate credentials were never wired through. FlipkartAdapter has
+      // accepted an `affiliate` option since the adapter was written and the
+      // runtime constructed it without one, so FlipkartAffiliateFetcher was
+      // always built unconfigured and the API strategy could not run — the
+      // class existing was mistaken for the integration working.
+      //
+      // Both values or neither: a half-configured client fails at request
+      // time with an auth error that looks like a credential problem rather
+      // than a wiring one.
+      affiliate:
+        process.env['FLIPKART_AFFILIATE_ID'] && process.env['FLIPKART_AFFILIATE_TOKEN']
+          ? {
+              affiliateId: process.env['FLIPKART_AFFILIATE_ID'],
+              affiliateToken: process.env['FLIPKART_AFFILIATE_TOKEN'],
+            }
+          : undefined,
       onStrategyFallback: (info) => logger.warn('fetch strategy escalated', { ...info }),
     }),
   };
@@ -169,6 +187,20 @@ export async function startWorkerRuntime(
             listingId: job.data.listingId,
             correlationId: job.data.correlationId,
           });
+
+          // Look for this product on the other marketplace. Only meaningful
+          // after a successful fetch: the query is built from the title, and
+          // a PENDING placeholder title searches for nothing useful.
+          //
+          // One discovery attempt per listing, ever — the id carries no date.
+          // The opposite marketplace's catalogue does not change often enough
+          // to justify re-searching daily, and each attempt costs a
+          // rate-limited PA-API call.
+          await producer.enqueue(
+            QUEUE.discover,
+            { listingId: job.data.listingId, correlationId: job.data.correlationId },
+            { jobId: `discover-${job.data.listingId}` },
+          );
         }
 
         return result;
@@ -206,6 +238,55 @@ export async function startWorkerRuntime(
       QUEUE.match,
       async (job: Job<MatchListingJob>) => matchListing(prisma, embeddings, job.data.listingId),
       { connection, concurrency: 2, ...POLL_BUDGET },
+    ),
+  );
+
+  // --- discover counterpart -----------------------------------------------
+  workers.push(
+    new Worker<DiscoverCounterpartJob>(
+      QUEUE.discover,
+      async (job: Job<DiscoverCounterpartJob>) => {
+        const result = await discoverCounterpart(
+          prisma,
+          (platform) => adapters[platform],
+          job.data.listingId,
+        );
+
+        // Candidates are created unfetched; they need the normal pipeline to
+        // become comparable. Scraping them chains into embed and match exactly
+        // as a user-pasted URL does, and the matcher decides whether any of
+        // them is actually the same product.
+        for (const listingId of result.created) {
+          const candidate = await prisma.marketplaceListing.findUnique({
+            where: { id: listingId },
+            select: { platform: true, externalId: true, url: true },
+          });
+          if (!candidate) continue;
+
+          await producer.enqueue(QUEUE.scrape, {
+            listingId,
+            platform: candidate.platform,
+            externalId: candidate.externalId,
+            url: candidate.url,
+            correlationId: job.data.correlationId,
+          });
+        }
+
+        // Logged rather than thrown when unavailable. A marketplace with no
+        // search source is a configuration fact, not a job failure, and
+        // retrying it would burn the queue's retry budget on something that
+        // cannot succeed until someone adds credentials.
+        if (!result.searched) {
+          logger.info('counterpart discovery skipped', {
+            listingId: job.data.listingId,
+            reason: result.reason ?? result.skipped,
+            retryable: result.retryable ?? false,
+          });
+        }
+
+        return result;
+      },
+      { connection, concurrency: 1, ...POLL_BUDGET },
     ),
   );
 
@@ -308,6 +389,20 @@ export async function startWorkerRuntime(
       { pattern: '0 4 * * *', jobId: 'repeat-retention' },
     );
   }
+
+  // Logged at boot because "is the API path actually on?" was previously
+  // unanswerable without reading code. A silent fallback to scraping looks
+  // identical to a working integration until it breaks.
+  logger.info('marketplace sources', {
+    amazonPaapi: Boolean(
+      process.env['PAAPI_ACCESS_KEY'] &&
+        process.env['PAAPI_SECRET_KEY'] &&
+        process.env['PAAPI_PARTNER_TAG'],
+    ),
+    flipkartAffiliate: Boolean(
+      process.env['FLIPKART_AFFILIATE_ID'] && process.env['FLIPKART_AFFILIATE_TOKEN'],
+    ),
+  });
 
   logger.info('worker runtime ready', {
     queues: Object.values(QUEUE),

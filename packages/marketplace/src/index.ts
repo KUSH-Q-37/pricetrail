@@ -24,3 +24,4 @@ export * from './flipkart/json-ld';
 export * from './flipkart/flipkart.parser';
 export * from './flipkart/flipkart.api';
 export * from './flipkart/flipkart.adapter';
+export * from './search';
