@@ -211,19 +211,47 @@ jobs:
 
       - run: pnpm --filter @pricetrail/web exec playwright install --with-deps chromium
 
+      # Logs are dumped inside this step, not a later `if: failure()` one.
+      #
+      # A separate step works, but it puts the reason in a different collapsed
+      # section from the error, and what gets read and reported is the wait-on
+      # timeout — which names the symptom and never the cause. Three rounds of
+      # this job were debugged by guesswork for exactly that reason. Failing
+      # loudly, in place, with the server output attached is worth the
+      # duplication.
       - name: Start API and web
         run: |
-          node apps/api/dist/main.js > /tmp/api.log 2>&1 &
-          pnpm --filter @pricetrail/web start > /tmp/web.log 2>&1 &
-          npx --yes wait-on http://localhost:3001/health/live http://localhost:3000/login -t 120000
+          set +e
 
-      # Without this, a server that died on startup shows up only as a
-      # wait-on timeout, and the actual reason is lost.
-      - name: Server logs on failure
-        if: failure()
-        run: |
-          echo '--- api ---'; tail -40 /tmp/api.log || true
-          echo '--- web ---'; tail -40 /tmp/web.log || true
+          node apps/api/dist/main.js > /tmp/api.log 2>&1 &
+          API_PID=$!
+          pnpm --filter @pricetrail/web start > /tmp/web.log 2>&1 &
+          WEB_PID=$!
+
+          npx --yes wait-on http://localhost:3001/health/live http://localhost:3000/login -t 120000
+          WAIT_STATUS=$?
+
+          if [ "$WAIT_STATUS" -ne 0 ]; then
+            echo ""
+            echo "=================== SERVERS DID NOT COME UP ==================="
+
+            # Whether the process is still alive separates "crashed" from
+            # "running but not listening" — completely different causes.
+            kill -0 "$API_PID" 2>/dev/null && echo "api process: ALIVE (started, not serving)" || echo "api process: DEAD (crashed on startup)"
+            kill -0 "$WEB_PID" 2>/dev/null && echo "web process: ALIVE (started, not serving)" || echo "web process: DEAD (crashed on startup)"
+
+            echo ""
+            echo "------------------------- api log ----------------------------"
+            cat /tmp/api.log 2>/dev/null || echo "(no api log — process never wrote anything)"
+            echo ""
+            echo "------------------------- web log ----------------------------"
+            cat /tmp/web.log 2>/dev/null || echo "(no web log — process never wrote anything)"
+            echo "=============================================================="
+
+            exit 1
+          fi
+
+          echo "both servers are up"
 
       - run: pnpm --filter @pricetrail/web test:e2e
 
