@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { Link2, Plus, X } from 'lucide-react';
+import { Link2, Search, X } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import { Alert } from '@/components/ui/alert';
@@ -55,8 +55,11 @@ export function AddProductDialog() {
   return (
     <>
       <Button onClick={() => setOpen(true)}>
-        <Plus className="size-4" aria-hidden="true" />
-        Track a product
+        {/* Search, not "add". Tracking is a consequence of searching now, not
+            a separate thing the user has to opt into, so the label names what
+            they are doing rather than what the system does about it. */}
+        <Search className="size-4" aria-hidden="true" />
+        Search a product
       </Button>
 
       <AnimatePresence>
@@ -83,7 +86,7 @@ export function AddProductDialog() {
               >
                 <div className="flex items-center justify-between border-b border-border p-5">
                   <h2 id="add-product-title" className="font-semibold">
-                    Track a product
+                    Search a product
                   </h2>
                   <button
                     onClick={close}
@@ -117,8 +120,11 @@ export function AddProductDialog() {
                       />
                     </div>
                     <p id="product-url-help" className="text-xs text-muted-foreground">
-                      Paste any amazon.in or flipkart.com product link. We will
-                      find the matching listing on the other marketplace.
+                      Paste any amazon.in or flipkart.com product link. We
+                      record today&rsquo;s price straight away, look for the
+                      same product on the other marketplace, and keep checking
+                      the price every day &mdash; there is nothing else to
+                      switch on.
                     </p>
                   </div>
 
@@ -133,7 +139,7 @@ export function AddProductDialog() {
                       Cancel
                     </Button>
                     <Button type="submit" loading={ingest.isPending} disabled={!url.trim()}>
-                      Start tracking
+                      Search
                     </Button>
                   </div>
                 </form>

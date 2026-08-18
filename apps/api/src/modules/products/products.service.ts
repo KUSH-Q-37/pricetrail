@@ -280,11 +280,21 @@ export class ProductsService {
   }
 
   /**
-   * Stop tracking for this user.
+   * Remove this user's favourite. Global price collection is unaffected.
    *
-   * The product and its price history are NOT deleted. Another user may track
-   * the same product, and even if nobody does, the history is the asset — if
-   * this user re-adds the product tomorrow, the chart is still complete.
+   * This used to switch trackingEnabled off across the product's listings once
+   * the last favourite was removed, on the reasoning that nobody was watching
+   * so nobody should pay to fetch it. That reasoning no longer holds: a
+   * searched product is globally tracked precisely so its history keeps
+   * accumulating for whoever searches it next, and history is the one thing
+   * that cannot be reconstructed later. One user tidying their list would have
+   * silently ended collection for everybody, and the gap would be permanent.
+   *
+   * The consequence is deliberate and worth stating: the globally tracked set
+   * only ever grows. Retention bounds storage, not fetch volume. If daily fetch
+   * cost becomes the binding constraint, the answer is an explicit policy —
+   * retiring listings that have gone unviewed for N months, say — and not the
+   * side effect of somebody unfavouriting something.
    */
   async untrack(user: AuthenticatedUser, productId: string): Promise<void> {
     const result = await this.prisma.trackedProduct.deleteMany({
@@ -293,19 +303,8 @@ export class ProductsService {
 
     if (result.count === 0) throw new NotFoundError('Tracked product', productId);
 
-    // Nobody is watching any more: stop paying to fetch it every day. The rows
-    // stay, so tracking can resume with history intact.
-    const remaining = await this.prisma.trackedProduct.count({
-      where: { productId },
-    });
-
-    if (remaining === 0) {
-      await this.prisma.marketplaceListing.updateMany({
-        where: { productId },
-        data: { trackingEnabled: false },
-      });
-      this.logger.info({ productId }, 'No trackers remain; paused daily fetching');
-    }
+    // Deliberately nothing else. See the note above: global collection is not
+    // a function of who has favourited the product.
   }
 
   async setNotifyThreshold(

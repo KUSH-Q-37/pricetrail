@@ -91,9 +91,13 @@ export function ProductCard({ product }: { product: Product }) {
             </button>
           </div>
         ) : (
+          // "Remove from my list", not "stop tracking": removing a favourite no
+          // longer stops price collection. The product stays globally tracked
+          // because its history must keep accumulating for whoever searches it
+          // next, so a label promising to stop tracking would be untrue.
           <button
             onClick={() => setConfirming(true)}
-            aria-label={`Stop tracking ${product.title}`}
+            aria-label={`Remove ${product.title} from my list`}
             className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
           >
             <Trash2 className="size-4" aria-hidden="true" />

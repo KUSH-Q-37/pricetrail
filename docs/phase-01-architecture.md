@@ -726,3 +726,83 @@ Free instances sleep after ~15 minutes idle, and a sleeping process runs no
 cron. The 02:00 daily sweep is registered in Redis and fires when the service
 is awake, so on a free tier it needs an external pinger to guarantee it. A
 paid always-on worker removes this entirely and is the correct end state.
+
+---
+
+## 10. Amendment — search is tracking, and history is a rolling window
+
+**Status: supersedes the manual-tracking flow in §2 and the retention silence in §4.**
+
+### 10.1 Global tracking is a property of the listing
+
+`TrackedProduct` is a user's favourite. `MarketplaceListing.trackingEnabled` is
+whether PriceTrail collects this listing's price. These were entangled: only a
+newly created listing got `trackingEnabled = true`, and `untrack()` switched it
+off across the product once the last favourite was removed.
+
+Both are now wrong by policy. Searching a URL enables global tracking, every
+time, regardless of who searched or whether the listing already existed.
+Removing a favourite does nothing to collection.
+
+The consequence is deliberate and worth stating: **the globally tracked set only
+ever grows.** Retention bounds storage, not fetch volume. If daily fetch cost
+becomes binding, the answer is an explicit retirement policy — listings unviewed
+for N months — and not the side effect of somebody tidying their list.
+
+### 10.2 The business date is Asia/Kolkata
+
+`captured_on` was computed with `getUTCDate()` while the scheduler fired on a
+cron with `tz: Asia/Kolkata`. 02:00 IST is 20:30 UTC the previous day, so the
+day boundary sat at 05:30 IST and an observation at 00:30 IST was filed under
+yesterday. Self-consistent, and consistently wrong.
+
+`businessDate()` in `@pricetrail/database` is now the single definition, used by
+both the writer and the sweep. Instants remain UTC in `captured_at`; only the
+bucket is local.
+
+### 10.3 One fetch per listing per business day
+
+Ingest and the daily sweep share the job id `fetch-<listingId>-<businessDate>`.
+The ingest id previously carried no date, making it permanent — BullMQ refuses a
+duplicate id, so after the first search that path could never enqueue again.
+
+`enqueueOrPromote` lets a search promote the sweep's delayed job rather than
+being dropped or forced to wait behind hours of jitter.
+
+### 10.4 Retention drops partitions
+
+`drop_price_point_partitions_before(cutoff, dry_run)` drops whole monthly
+partitions rather than deleting rows. `dry_run` defaults to TRUE, a future
+cutoff is refused, and a partition whose range extends past the cutoff is never
+touched — so the boundary month survives intact.
+
+A daily `retention` maintenance job runs it at 04:00, after the sweep. The
+window is `PRICE_HISTORY_RETENTION_MONTHS`, default 15, and **must** stay in
+step with the longest chart range: offering a range longer than retention
+renders a window guaranteed to be partly empty for a reason no user can see.
+
+### 10.5 Matching now produces a canonical product
+
+The matcher scored pairs, wrote a `ProductMatch` row, and stopped — nothing
+reparented the listings. Since the history endpoint reads listings through their
+product, an AUTO_CONFIRMED pair scored correctly and still rendered as two
+unrelated charts. The match was right and invisible.
+
+`mergeIntoCanonicalProduct` merges on AUTO_CONFIRMED only. NEEDS_REVIEW stays
+split, because two charts is the honest rendering of "we are not sure", and a
+wrong merge corrupts two histories at once.
+
+### 10.6 Discovery, and what blocks it
+
+Matching could only score listings already present locally, so a pasted Amazon
+URL yielded no comparison until somebody happened to paste the Flipkart one.
+`discover-counterpart` searches the opposite marketplace and creates candidates
+under their own products — never attached to the source — leaving the matcher
+to decide. Candidates start untracked; confirmation enables both sides.
+
+**Neither search source is currently usable.** Amazon PA-API `SearchItems` is
+implemented and correct, but Amazon gates the credentials behind qualifying
+sales. Flipkart has no public API, and its search page carries none of the
+JSON-LD that makes product-page parsing trustworthy, so it reports unavailable
+rather than guessing. Discovery therefore degrades to a logged, non-retryable
+skip — the user still gets the product they asked for, still tracked.
