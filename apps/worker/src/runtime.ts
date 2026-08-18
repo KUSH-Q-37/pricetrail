@@ -84,26 +84,38 @@ export interface WorkerRuntime {
 }
 
 /**
- * Redis command budget.
+ * Redis polling cadence.
  *
- * BullMQ is chatty when idle. Each worker re-issues a blocking read every
+ * BullMQ is chatty when idle: each worker re-issues a blocking read every
  * `drainDelay` seconds and runs a stalled-job check every `stalledInterval`
- * ms, per queue. At the defaults (5s / 30s) four queues cost roughly 250,000
- * Redis commands a day doing nothing at all — which exhausted a 500,000/month
- * free tier in two days and took the API down with it, because a Redis that
- * refuses AUTH is indistinguishable from a Redis that is gone.
+ * ms, per queue. At the library defaults four queues cost roughly 250,000
+ * Redis commands a day doing nothing, which is what exhausted a 500,000/month
+ * Upstash tier in two days and took the API down with it.
  *
- * This workload is one sweep a day plus occasional user-triggered ingests.
- * Latency of up to a minute on job pickup is invisible for a price tracker;
- * running out of Redis is not. These values cut idle traffic by ~90%.
+ * The response then was drainDelay 60s, and that was too blunt. A blocking
+ * read wakes instantly when a job is pushed, but a PRIORITISED job lands in a
+ * sorted set the worker reaches on its next cycle — so a user's search could
+ * wait a full minute before anything began fetching. It also broke the queue
+ * round-trip test, which allows ten seconds and had been passing.
  *
- * Raise them only alongside a paid Redis plan.
+ * These defaults are set for an UNMETERED Redis, which is what this now runs
+ * on (Render Key Value, no command limit). Responsiveness is the thing worth
+ * buying there; commands are free.
+ *
+ * On a metered Redis, raise QUEUE_DRAIN_DELAY — 60 cuts idle traffic by about
+ * 90% at the cost of up to a minute before a searched product starts fetching.
+ * That is the whole trade-off, and it is a deployment decision rather than a
+ * code one.
  */
 const POLL_BUDGET = {
-  /** Seconds a blocking read waits before re-issuing. Default 5. */
-  drainDelay: Number(process.env['QUEUE_DRAIN_DELAY'] ?? 60),
-  /** Ms between stalled-job checks. Default 30_000. */
-  stalledInterval: Number(process.env['QUEUE_STALLED_INTERVAL'] ?? 300_000),
+  /** Seconds a blocking read waits before re-issuing. BullMQ's own default. */
+  drainDelay: Number(process.env['QUEUE_DRAIN_DELAY'] ?? 5),
+  /**
+   * Ms between stalled-job checks. Twice BullMQ's default: it halves the
+   * largest idle cost that does not affect pickup latency at all, since a
+   * stalled job is by definition one already being worked.
+   */
+  stalledInterval: Number(process.env['QUEUE_STALLED_INTERVAL'] ?? 60_000),
 } as const;
 
 export async function startWorkerRuntime(
