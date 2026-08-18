@@ -69,7 +69,9 @@ export type MaintenanceTask =
   | 'ensure-partitions'
   | 'embed-backfill'
   /** Drops price_points partitions older than the retention window. */
-  | 'retention';
+  | 'retention'
+  /** Stops collecting listings nobody has searched or favourited in a long time. */
+  | 'retire-tracking';
 
 export interface MaintenanceJob extends BaseJob {
   task: MaintenanceTask;

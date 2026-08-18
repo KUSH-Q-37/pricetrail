@@ -83,8 +83,15 @@ export function extractScreenInches(input: string): number | undefined {
     text,
   );
   if (!match?.[1]) return undefined;
-  const value = Number(match[1]);
-  return value >= 1 && value <= 120 ? value : undefined;
+
+  // Indian marketplaces write screen size as "15.49 cm (6.1 inch)", and that
+  // branch of the alternation puts the CENTIMETRES in group 1 and the inches
+  // in group 2. Reading group 1 unconditionally returned 15.49 for a 6.1-inch
+  // phone — not obviously wrong at a glance, and enough to make every
+  // Amazon/Flipkart screen comparison disagree.
+  const inches = match[2] !== undefined ? Number(match[2]) : Number(match[1]);
+
+  return inches >= 1 && inches <= 120 ? inches : undefined;
 }
 
 /**

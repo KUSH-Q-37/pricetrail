@@ -161,7 +161,20 @@ async function main(): Promise<void> {
   // --- products ------------------------------------------------------------
   await prisma.product.upsert({
     where: { id: IDS.phone },
-    update: {},
+    // Same reasoning as the listing upsert below: an empty update let a
+    // fixture created before `attributes` was added keep `{}` forever, which
+    // made the attribute layer inapplicable and pinned every match to the
+    // "no comparable attributes" cap of 0.8 — hiding the effect embeddings are
+    // supposed to have and failing the test that checks for it.
+    update: {
+      category: ProductCategory.PHONE,
+      brand: 'Apple',
+      displayTitle: 'Apple iPhone 15 Pro (256 GB, Natural Titanium)',
+      normalizedTitle: 'apple iphone 15 pro 256 gb natural titanium',
+      modelNumber: 'A3102',
+      status: ProductStatus.READY,
+      attributes: { storage_gb: 256, ram_gb: 8, colour: 'natural titanium' },
+    },
     create: {
       id: IDS.phone,
       category: ProductCategory.PHONE,
@@ -176,7 +189,15 @@ async function main(): Promise<void> {
 
   await prisma.product.upsert({
     where: { id: IDS.fridge },
-    update: {},
+    update: {
+      category: ProductCategory.REFRIGERATOR,
+      brand: 'LG',
+      displayTitle: 'LG 260 L 3 Star Frost-Free Double Door Refrigerator',
+      normalizedTitle: 'lg 260 l 3 star frost free double door refrigerator',
+      modelNumber: 'GL-S292RPZX',
+      status: ProductStatus.READY,
+      attributes: { capacity_l: 260, star_rating: 3, type: 'double door' },
+    },
     create: {
       id: IDS.fridge,
       category: ProductCategory.REFRIGERATOR,
@@ -272,7 +293,32 @@ async function main(): Promise<void> {
   for (const l of listings) {
     await prisma.marketplaceListing.upsert({
       where: { platform_externalId: { platform: l.platform, externalId: l.externalId } },
-      update: {},
+      // Converge the fixture's IDENTITY on every run, rather than `update: {}`.
+      //
+      // An empty update meant the seed could create a correct row but never
+      // correct one that had drifted. A database seeded before `ean` was added
+      // to these fixtures kept null EANs forever, no matter how many times the
+      // seed was re-run — which silently disabled the identifier layer of the
+      // matcher and made four integration tests fail on any machine whose
+      // database predated that field. The tests were right; the fixtures were
+      // stale and unfixable.
+      //
+      // Observed data is deliberately NOT in this list. Prices, availability
+      // and scrape timestamps are left exactly as found, so re-seeding repairs
+      // what the fixtures assert without erasing anything actually collected.
+      update: {
+        productId: l.productId,
+        url: l.url,
+        title: l.title,
+        normalizedTitle: l.normalizedTitle,
+        brand: l.brand,
+        modelNumber: l.modelNumber,
+        ean: l.ean,
+        sellerName: l.sellerName,
+        rating: l.rating,
+        reviewCount: l.reviewCount,
+        platformData: l.platformData,
+      },
       create: {
         id: l.id,
         productId: l.productId,

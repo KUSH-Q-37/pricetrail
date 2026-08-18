@@ -10,6 +10,7 @@ import {
   parsePriceToMinor,
 } from '../shared/price';
 import { cleanText, parseRating, parseReviewCount } from '../shared/text';
+import { parseFlipkartSpecifications } from './flipkart.specs';
 import { extractJsonLdProduct } from './json-ld';
 import { FLIPKART_SELECTORS } from './selectors';
 
@@ -167,7 +168,19 @@ export function parseFlipkartProduct(
   }
 
   const jsonLd = extractJsonLdProduct(root);
-  const specs = extractSpecs(root);
+  // State JSON first, DOM selectors second — the same precedence, and for the
+  // same reason, as JSON-LD over CSS for the price. The class-based extractor
+  // below returned {} for every listing in the database (19 of 19), because
+  // Flipkart rotated the hashes it depends on. An empty spec map makes the
+  // matcher's attribute layer inapplicable, which pins confidence under the
+  // "no comparable attributes" cap and stops any pair auto-confirming without
+  // a shared barcode.
+  //
+  // The DOM path is kept rather than deleted: it costs nothing when the state
+  // extractor succeeds, and it is the fallback if Flipkart changes the shape
+  // of its serialised state.
+  const stateSpecs = parseFlipkartSpecifications(html);
+  const specs = Object.keys(stateSpecs).length > 0 ? stateSpecs : extractSpecs(root);
 
   // --- price ---------------------------------------------------------------
   // JSON-LD wins when present: it is a plain machine-readable number, free of

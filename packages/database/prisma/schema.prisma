@@ -303,6 +303,14 @@ model MarketplaceListing {
   /// and raises an alert rather than hammering a dead URL forever.
   consecutiveFailures Int @default(0) @map("consecutive_failures")
 
+  /// Last time a user searched this listing's URL.
+  ///
+  /// Searching is what enrols a listing in global tracking, so without this
+  /// the tracked set could only ever grow: nothing recorded whether anyone
+  /// still cared. Retirement uses it to stand down listings nobody has looked
+  /// at in a long time; a single search revives one instantly.
+  lastSearchedAt DateTime? @map("last_searched_at") @db.Timestamptz(3)
+
   /// Platform-specific extras that do not deserve a column: Amazon sales
   /// rank / browse nodes, Flipkart F-Assured, Plus eligibility. Validated by
   /// a per-platform Zod schema on write, so it is typed at the boundary even

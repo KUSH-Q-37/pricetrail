@@ -41,6 +41,7 @@ import {
 
 import { applyRetention } from './jobs/apply-retention';
 import { discoverCounterpart } from './jobs/discover-counterpart';
+import { retireStaleTracking } from './jobs/retire-stale-tracking';
 import { embedMissingListings } from './jobs/embed-listings';
 import { planDailySweep } from './jobs/daily-sweep';
 import { matchListing } from './jobs/match-listings';
@@ -338,6 +339,21 @@ export async function startWorkerRuntime(
             return result;
           }
 
+          case 'retire-tracking': {
+            // Retention bounds storage; this bounds work. Without it the daily
+            // fetch bill grows monotonically with every URL anyone has ever
+            // pasted, until the sweep cannot finish inside its window.
+            const result = await retireStaleTracking(prisma, {
+              afterMonths: Number(process.env['TRACKING_RETIRE_AFTER_MONTHS'] ?? 12),
+            });
+
+            if (result.retired > 0 || result.skipped) {
+              logger.info('tracking retirement', { ...result });
+            }
+
+            return result;
+          }
+
           default:
             throw new Error(`Unknown maintenance task: ${String(job.data.task)}`);
         }
@@ -387,6 +403,13 @@ export async function startWorkerRuntime(
       QUEUE.maintenance,
       { task: 'retention' },
       { pattern: '0 4 * * *', jobId: 'repeat-retention' },
+    );
+    // Weekly is enough: the cutoff moves by a month at a time, so running it
+    // daily would scan the same rows seven times to find the same nothing.
+    await producer.schedule(
+      QUEUE.maintenance,
+      { task: 'retire-tracking' },
+      { pattern: '30 4 * * 0', jobId: 'repeat-retire-tracking' },
     );
   }
 

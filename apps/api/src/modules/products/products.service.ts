@@ -101,7 +101,10 @@ export class ProductsService {
           externalId: parsed.externalId,
         },
       },
-      data: { trackingEnabled: true },
+      // lastSearchedAt is what lets retirement distinguish a product people
+      // still look at from one searched once a year ago. Without it the
+      // tracked set could only ever grow.
+      data: { trackingEnabled: true, lastSearchedAt: new Date() },
       select: { id: true, url: true },
     });
 
