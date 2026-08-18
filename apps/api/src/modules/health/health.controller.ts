@@ -10,6 +10,7 @@ import { SkipRateLimit } from '../../common/rate-limit/rate-limit.decorator';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { RedisService } from '../../infra/redis/redis.service';
 import { Public } from '../auth/decorators';
+import { isWorkerUnhealthy, workerStatus } from '../../infra/worker/worker-status';
 
 type DependencyState = 'up' | 'down';
 
@@ -17,7 +18,24 @@ interface ReadinessReport {
   status: 'ok' | 'degraded';
   uptimeSeconds: number;
   dependencies: Record<string, { status: DependencyState; latencyMs?: number; error?: string }>;
+  /** Co-hosted queue consumers. See infra/worker/worker-status.ts. */
+  workers: { state: string; attempts: number; lastError?: string; runningSince?: string };
+  /** Freshness of the data this product exists to collect. */
+  observations: {
+    newestCapturedOn: string | null;
+    ageHours: number | null;
+    stale: boolean;
+  };
 }
+
+/**
+ * How old the newest observation may be before readiness fails.
+ *
+ * The sweep runs daily, so 24 hours is the expected maximum. 26 gives the
+ * sweep window and a slow scrape room to finish without flapping, while still
+ * catching a missed day the morning after rather than three days later.
+ */
+const MAX_OBSERVATION_AGE_HOURS = 26;
 
 /**
  * Liveness and readiness, split deliberately.
@@ -67,15 +85,31 @@ export class HealthController {
   @ApiResponse({ status: 200, description: 'All dependencies healthy' })
   @ApiResponse({ status: 503, description: 'One or more dependencies are down' })
   async ready(): Promise<ReadinessReport> {
-    const [database, redis] = await Promise.all([
+    const [database, redis, observations] = await Promise.all([
       this.check(() => this.prisma.ping()),
       this.check(() => this.redis.ping()),
+      this.observationFreshness(),
     ]);
 
+    // Reachable dependencies are necessary but not sufficient.
+    //
+    // For three days in Aug 2026 this endpoint returned "ok" while nothing was
+    // consuming the queue: Postgres and Redis were both up, so by the only
+    // question it asked, everything was fine. The product was silently not
+    // doing the one thing it exists to do. A readiness check that cannot fail
+    // for the most likely failure is decoration.
+    const healthy =
+      database.status === 'up' &&
+      redis.status === 'up' &&
+      !isWorkerUnhealthy() &&
+      !observations.stale;
+
     const report: ReadinessReport = {
-      status: database.status === 'up' && redis.status === 'up' ? 'ok' : 'degraded',
+      status: healthy ? 'ok' : 'degraded',
       uptimeSeconds: this.uptimeSeconds(),
       dependencies: { database, redis },
+      workers: { ...workerStatus },
+      observations,
     };
 
     if (report.status !== 'ok') {
@@ -85,6 +119,40 @@ export class HealthController {
     }
 
     return report;
+  }
+
+  /**
+   * Age of the most recent price observation.
+   *
+   * Never stale when no observations exist at all — a fresh deployment with no
+   * tracked products has nothing to be late about, and failing there would
+   * make the check cry wolf before the system has been asked to do anything.
+   */
+  private async observationFreshness(): Promise<ReadinessReport['observations']> {
+    try {
+      const newest = await this.prisma.pricePoint.findFirst({
+        orderBy: { capturedOn: 'desc' },
+        select: { capturedOn: true },
+      });
+
+      if (!newest) {
+        return { newestCapturedOn: null, ageHours: null, stale: false };
+      }
+
+      const ageHours = Math.floor(
+        (Date.now() - newest.capturedOn.getTime()) / (1000 * 60 * 60),
+      );
+
+      return {
+        newestCapturedOn: newest.capturedOn.toISOString(),
+        ageHours,
+        stale: ageHours > MAX_OBSERVATION_AGE_HOURS,
+      };
+    } catch {
+      // The database probe above already reports connectivity; do not fail
+      // twice for one cause.
+      return { newestCapturedOn: null, ageHours: null, stale: false };
+    }
   }
 
   private async check(

@@ -14,6 +14,7 @@ import { AppModule } from './app.module';
 import { correlationIdMiddleware } from './common/middleware/correlation-id.middleware';
 import { AppConfigService } from './config/app-config.service';
 import { PrismaService } from './infra/prisma/prisma.service';
+import { setWorkerState } from './infra/worker/worker-status';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -116,30 +117,66 @@ async function bootstrap(): Promise<void> {
   // dedicated worker service and set RUN_WORKERS_IN_API=false when traffic
   // justifies it — the runtime is the same code either way.
   if (config.runWorkersInApi) {
-    try {
-      const runtime = await startWorkerRuntime({
-        redisUrl: config.redisUrl,
-        scrapeConcurrency: config.apiScrapeConcurrency,
-        // Reuse the API's pool rather than opening a second one; a free
-        // Postgres tier counts connections.
-        prisma: app.get(PrismaService),
-        logger: {
-          info: (message, meta) => logger.log({ ...meta }, message),
-          warn: (message, meta) => logger.warn({ ...meta }, message),
-          error: (message, meta) => logger.error({ ...meta }, message),
-        },
-      });
+    // Retried with backoff, and this is not decoration.
+    //
+    // The first version of this caught a startup failure, logged, and carried
+    // on. That is correct as far as it goes — a queue that will not start must
+    // not take request serving down with it — but with no retry, a few seconds
+    // of Redis unavailability during boot disabled all background work
+    // permanently. It happened on 15 Aug 2026 and cost two days of price
+    // observations that cannot be recovered.
+    //
+    // Redis being briefly unreachable is an ordinary event on managed tiers.
+    // Treating it as fatal-until-redeploy was the bug.
+    const MAX_ATTEMPTS = 10;
 
-      process.on('SIGTERM', () => void runtime.stop());
-    } catch (error: unknown) {
-      // A queue that will not start must not take the API down with it.
-      // Reading existing price history stays available; only new fetches
-      // stall, which is far better than a total outage.
-      logger.error(
-        { error: String(error) },
-        'co-hosted workers failed to start; API continues without them',
-      );
-    }
+    const startWorkers = async (attempt = 1): Promise<void> => {
+      setWorkerState(attempt === 1 ? 'starting' : 'retrying');
+
+      try {
+        const runtime = await startWorkerRuntime({
+          redisUrl: config.redisUrl,
+          scrapeConcurrency: config.apiScrapeConcurrency,
+          // Reuse the API's pool rather than opening a second one; a free
+          // Postgres tier counts connections.
+          prisma: app.get(PrismaService),
+          logger: {
+            info: (message, meta) => logger.log({ ...meta }, message),
+            warn: (message, meta) => logger.warn({ ...meta }, message),
+            error: (message, meta) => logger.error({ ...meta }, message),
+          },
+        });
+
+        setWorkerState('running');
+        logger.log({ attempt }, 'co-hosted workers running');
+        process.on('SIGTERM', () => void runtime.stop());
+      } catch (error: unknown) {
+        setWorkerState('retrying', error);
+
+        if (attempt >= MAX_ATTEMPTS) {
+          // Give up retrying, but record it so /health/ready reports 503 and
+          // the scheduled keepalive check fails loudly. Silence was the real
+          // failure last time, not the crash.
+          setWorkerState('failed', error);
+          logger.error(
+            { attempt, error: String(error) },
+            'co-hosted workers failed permanently; queue has no consumer',
+          );
+          return;
+        }
+
+        // 2s, 4s, 8s ... capped at 60s. Roughly six minutes of tolerance
+        // across ten attempts, which covers a managed Redis restarting.
+        const delayMs = Math.min(60_000, 2 ** attempt * 1000);
+        logger.warn(
+          { attempt, delayMs, error: String(error) },
+          'co-hosted workers failed to start; retrying',
+        );
+        setTimeout(() => void startWorkers(attempt + 1), delayMs);
+      }
+    };
+
+    void startWorkers();
   }
 }
 
