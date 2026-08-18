@@ -1,9 +1,18 @@
-import type { PrismaClient } from '@pricetrail/database';
-import { QUEUE, type QueueProducer } from '@pricetrail/queue';
+import { businessDate, businessDateKey, type PrismaClient } from '@pricetrail/database';
+import { QUEUE, scrapeJobId, type QueueProducer } from '@pricetrail/queue';
 
 export interface SweepResult {
+  /** Listings tracked and not yet observed today. */
   due: number;
-  enqueued: number;
+  /**
+   * Jobs handed to BullMQ — NOT jobs created.
+   *
+   * Named `submitted` deliberately. Job ids are per listing per business day,
+   * so a second run submits the same ids and BullMQ drops them. The previous
+   * name reported 5 on a re-run that created nothing, which reads as a
+   * duplicate-fetch bug when the dedup is in fact working.
+   */
+  submitted: number;
   windowMinutes: number;
 }
 
@@ -34,15 +43,21 @@ export async function planDailySweep(
   const windowMinutes = options.windowMinutes ?? 360;
   const limit = options.limit ?? 100_000;
 
-  const startOfDayUtc = new Date();
-  startOfDayUtc.setUTCHours(0, 0, 0, 0);
+  // The business date in Asia/Kolkata, not the UTC date.
+  //
+  // The cron that triggers this fires at 02:00 IST = 20:30 UTC the previous
+  // day, so a UTC-derived "today" asked whether yesterday had been observed.
+  // It must agree with what scrapeListing writes into captured_on, or the
+  // sweep re-fetches listings it already has and skips ones it does not.
+  const today = businessDate();
+  const todayKey = businessDateKey();
 
   // Served by the partial index on (tracking_enabled, last_scraped_at).
   // NULLS FIRST puts never-fetched listings at the front of the queue.
   const due = await prisma.marketplaceListing.findMany({
     where: {
       trackingEnabled: true,
-      NOT: { pricePoints: { some: { capturedOn: startOfDayUtc } } },
+      NOT: { pricePoints: { some: { capturedOn: today } } },
     },
     select: { id: true, platform: true, externalId: true, url: true },
     orderBy: { lastScrapedAt: { sort: 'asc', nulls: 'first' } },
@@ -50,12 +65,12 @@ export async function planDailySweep(
   });
 
   if (due.length === 0) {
-    return { due: 0, enqueued: 0, windowMinutes };
+    return { due: 0, submitted: 0, windowMinutes };
   }
 
   const windowMs = windowMinutes * 60_000;
 
-  const enqueued = await producer.enqueueBulk(
+  const submitted = await producer.enqueueBulk(
     QUEUE.scrape,
     due.map((listing) => ({
       payload: {
@@ -67,14 +82,12 @@ export async function planDailySweep(
       },
       options: {
         delay: Math.floor(Math.random() * windowMs),
-        // Idempotent per listing per day: if the sweep is triggered twice
-        // (manual run plus the cron), the second enqueue is a no-op rather
-        // than a duplicate fetch. Hyphen-separated because BullMQ rejects
-        // ':' in custom job IDs.
-        jobId: `sweep-${listing.id}-${startOfDayUtc.toISOString().slice(0, 10)}`,
+        // Idempotent per listing per business day, and shared with the
+        // ingest path so a searched product is not fetched twice today.
+        jobId: scrapeJobId(listing.id, todayKey),
       },
     })),
   );
 
-  return { due: due.length, enqueued, windowMinutes };
+  return { due: due.length, submitted, windowMinutes };
 }

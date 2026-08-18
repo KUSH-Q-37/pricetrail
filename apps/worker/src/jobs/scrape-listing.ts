@@ -5,6 +5,7 @@ import {
   Platform,
   ProductStatus,
   ScrapeJobStatus,
+  businessDate,
   type PrismaClient,
 } from '@pricetrail/database';
 import {
@@ -140,15 +141,14 @@ export async function scrapeListing(
   const finishedAt = now();
   const product = outcome.product;
 
-  // captured_on is the partition key and the daily identity. UTC date, matching
-  // the column contract from Phase 2.
-  const capturedOn = new Date(
-    Date.UTC(
-      finishedAt.getUTCFullYear(),
-      finishedAt.getUTCMonth(),
-      finishedAt.getUTCDate(),
-    ),
-  );
+  // captured_on is the partition key and the daily identity — the business
+  // date in Asia/Kolkata, not the UTC date.
+  //
+  // This used to be getUTCDate(). The scheduler fires on a cron with tz
+  // Asia/Kolkata, so 02:00 IST is 20:30 UTC the previous day: the day boundary
+  // sat at 05:30 IST, and an observation taken at 00:30 IST was filed under
+  // yesterday. Consistent with itself, and consistently wrong.
+  const capturedOn = businessDate(finishedAt);
 
   const attributes = normalizeAttributes(product.rawAttributes);
 

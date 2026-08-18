@@ -67,6 +67,18 @@ export const envSchema = z.object({
    */
   API_SCRAPE_CONCURRENCY: z.coerce.number().int().positive().max(4).default(1),
 
+  /**
+   * How many months of price history to keep.
+   *
+   * The daily retention job drops price_points partitions entirely older than
+   * this. It must stay in step with the longest chart range in
+   * price.schemas.ts — offering a range longer than retention would render a
+   * window guaranteed to be partly empty for a reason the user cannot see.
+   *
+   * Minimum 2: a value of 1 could put the cutoff inside the current month.
+   */
+  PRICE_HISTORY_RETENTION_MONTHS: z.coerce.number().int().min(2).max(120).default(15),
+
   LOG_LEVEL: z
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
     .default('info'),

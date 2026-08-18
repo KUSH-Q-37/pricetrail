@@ -57,6 +57,47 @@ export class QueueProducer {
   }
 
   /**
+   * Enqueue for immediate work, promoting an existing delayed job instead of
+   * refusing to add a duplicate.
+   *
+   * The daily sweep and a user search both want the same thing — one fetch of
+   * this listing, today — but they want it on different schedules. The sweep
+   * spreads jobs over hours of jitter so two marketplaces are not hit by a
+   * thundering herd; a user who just pasted a URL is waiting for an answer now.
+   *
+   * Sharing a job id makes the pair idempotent (one fetch per listing per day,
+   * whichever path got there first), and promoting turns the sweep's delayed
+   * job into an immediate one rather than making the user wait behind it. Plain
+   * `add` with an existing id is silently dropped by BullMQ, which is how a
+   * search could return with nothing ever being fetched.
+   */
+  async enqueueOrPromote<T extends QueueName>(
+    name: T,
+    payload: JobPayloads[T],
+    options: JobsOptions & { jobId: string },
+  ): Promise<'enqueued' | 'promoted' | 'already-pending'> {
+    const queue = this.get(name);
+    const existing = await queue.getJob(options.jobId);
+
+    if (existing) {
+      // Only a delayed job can be promoted. One that is waiting, active or
+      // already completed today needs nothing done to it.
+      const state = await existing.getState();
+      if (state === 'delayed') {
+        await existing.promote();
+        return 'promoted';
+      }
+      return 'already-pending';
+    }
+
+    // Racing another caller here is harmless: `add` with a duplicate jobId is
+    // a no-op, so the worst case is that one of the two returns 'enqueued'
+    // without having been the one to create it.
+    await queue.add(name, payload, options);
+    return 'enqueued';
+  }
+
+  /**
    * Enqueue many jobs in one round trip.
    *
    * The daily sweep enqueues thousands at once; `addBulk` is a single pipeline

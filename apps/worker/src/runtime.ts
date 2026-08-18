@@ -38,6 +38,7 @@ import {
   type ScrapeListingJob,
 } from '@pricetrail/queue';
 
+import { applyRetention } from './jobs/apply-retention';
 import { embedMissingListings } from './jobs/embed-listings';
 import { planDailySweep } from './jobs/daily-sweep';
 import { matchListing } from './jobs/match-listings';
@@ -233,6 +234,29 @@ export async function startWorkerRuntime(
           case 'embed-backfill':
             return embedMissingListings(prisma, embeddings, { batchSize: 32 });
 
+          case 'retention': {
+            // Rolling window. Drops whole monthly partitions older than the
+            // retention period rather than deleting rows — see
+            // apply-retention.ts for why that distinction matters.
+            const result = await applyRetention(prisma, {
+              retentionMonths: Number(
+                process.env['PRICE_HISTORY_RETENTION_MONTHS'] ?? 15,
+              ),
+            });
+
+            // Logged explicitly, not just returned: this is the one scheduled
+            // job that destroys data, and "what was removed and when" needs to
+            // survive in the log even when nobody inspects the job result.
+            logger.info('retention applied', {
+              cutoff: result.cutoff,
+              retentionMonths: result.retentionMonths,
+              droppedCount: result.dropped.length,
+              dropped: result.dropped,
+            });
+
+            return result;
+          }
+
           default:
             throw new Error(`Unknown maintenance task: ${String(job.data.task)}`);
         }
@@ -272,6 +296,16 @@ export async function startWorkerRuntime(
       QUEUE.maintenance,
       { task: 'ensure-partitions' },
       { pattern: '0 3 1 * *', jobId: 'repeat-ensure-partitions' },
+    );
+    // Daily, and deliberately after the sweep rather than before it. Running
+    // retention first would mean the day's collection and the day's deletion
+    // compete for the same connections on a small instance, for no benefit —
+    // a partition that is 15 months old at 02:00 is still 15 months old at
+    // 04:00.
+    await producer.schedule(
+      QUEUE.maintenance,
+      { task: 'retention' },
+      { pattern: '0 4 * * *', jobId: 'repeat-retention' },
     );
   }
 

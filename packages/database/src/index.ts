@@ -4,6 +4,7 @@ import { PrismaClient } from '../generated/client';
 
 export * from '../generated/client';
 export * from './vector';
+export * from './business-date';
 
 /**
  * A single PrismaClient per process.

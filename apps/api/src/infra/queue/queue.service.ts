@@ -1,8 +1,10 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { businessDateKey } from '@pricetrail/database';
 import {
   QUEUE,
   QueueProducer,
   createRedisConnection,
+  scrapeJobId,
   type ScrapeListingJob,
 } from '@pricetrail/queue';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
@@ -46,20 +48,23 @@ export class QueueService implements OnModuleDestroy {
    */
   async enqueueScrape(job: ScrapeListingJob): Promise<void> {
     try {
-      await this.producer.enqueue(
+      const outcome = await this.producer.enqueueOrPromote(
         QUEUE.scrape,
         { ...job, correlationId: job.correlationId ?? RequestContextStore.correlationId },
         {
           // Ingest is user-facing: jump ahead of the daily sweep's backlog.
           priority: 1,
-          // One pending fetch per listing. Re-pasting the same URL while the
-          // first fetch is still queued must not enqueue a second.
-          //
-          // Hyphens, not colons: BullMQ reserves ':' in custom job IDs as
-          // well as in queue names ("Custom Id cannot contain :").
-          jobId: `ingest-${job.listingId}`,
+          // One fetch per listing per business day, shared with the daily
+          // sweep — see scrapeJobId(). The id used to be `ingest-<listingId>`
+          // with no date, which made it permanent: BullMQ refuses a duplicate
+          // id, so after the first search a listing could never be enqueued
+          // from this path again. That is fatal to "search collects today's
+          // price", because every search after the first silently did nothing.
+          jobId: scrapeJobId(job.listingId, businessDateKey()),
         },
       );
+
+      this.logger.debug({ listingId: job.listingId, outcome }, 'Scrape enqueue');
     } catch (error) {
       this.logger.error(
         { err: error, listingId: job.listingId },

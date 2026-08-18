@@ -4,7 +4,7 @@ import {
   parseMarketplaceUrl,
   type ParsedMarketplaceUrl,
 } from '@pricetrail/marketplace';
-import { Platform, ProductStatus, Prisma } from '@pricetrail/database';
+import { Platform, ProductStatus, Prisma, businessDate } from '@pricetrail/database';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 
 import {
@@ -83,22 +83,48 @@ export class ProductsService {
       ? existing.productId
       : await this.createPendingProduct(parsed);
 
-    await this.trackForUser(user, productId);
-
-    // Queue the fetch for listings that have never been fetched. Enqueued
-    // AFTER the tracking write so a quota rejection does not leave an orphan
-    // job fetching a product nobody is watching.
-    const listing = await this.prisma.marketplaceListing.findUnique({
+    // Searching a URL IS what puts it into global tracking.
+    //
+    // Global collection is a property of the listing, not of any user's
+    // interest in it. Previously only newly-created listings got
+    // trackingEnabled = true, so a listing that had been untracked stayed
+    // untracked no matter how many people searched it, and the daily sweep
+    // skipped it forever.
+    //
+    // Done before the per-user write, and independently of it, so a quota
+    // rejection or a failure to record someone's favourite cannot stop the
+    // system collecting prices for a product it now knows about.
+    const listing = await this.prisma.marketplaceListing.update({
       where: {
         platform_externalId: {
           platform: parsed.platform as Platform,
           externalId: parsed.externalId,
         },
       },
-      select: { id: true, lastSuccessAt: true, url: true },
+      data: { trackingEnabled: true },
+      select: { id: true, url: true },
     });
 
-    if (listing && !listing.lastSuccessAt) {
+    await this.trackForUser(user, productId);
+
+    // Collect today's observation now rather than waiting for the 02:00 sweep.
+    //
+    // The guard is "has today been observed", not "has this ever succeeded".
+    // The old condition (!lastSuccessAt) meant a product fetched once, months
+    // ago, produced nothing on a re-search — the user saw a stale price and
+    // the day's data point was simply missed.
+    //
+    // The enqueue is idempotent per listing per business day and shares its id
+    // with the sweep, so searching a product the sweep has already queued
+    // promotes that job rather than adding a second fetch.
+    const observedToday = await this.prisma.pricePoint.findUnique({
+      where: {
+        listingId_capturedOn: { listingId: listing.id, capturedOn: businessDate() },
+      },
+      select: { listingId: true },
+    });
+
+    if (!observedToday) {
       await this.queue.enqueueScrape({
         listingId: listing.id,
         platform: parsed.platform as Platform,

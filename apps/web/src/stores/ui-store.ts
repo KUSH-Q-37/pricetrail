@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 /** The six ranges the price chart offers (Phase 12). */
-export type ChartRange = '7D' | '1M' | '3M' | '6M' | '1Y' | '18M';
+export type ChartRange = '7D' | '1M' | '3M' | '6M' | '1Y' | '15M';
 
 export const CHART_RANGES: Array<{ value: ChartRange; label: string; days: number }> = [
   { value: '7D', label: '7 Days', days: 7 },
@@ -10,7 +10,8 @@ export const CHART_RANGES: Array<{ value: ChartRange; label: string; days: numbe
   { value: '3M', label: '3 Months', days: 90 },
   { value: '6M', label: '6 Months', days: 180 },
   { value: '1Y', label: '1 Year', days: 365 },
-  { value: '18M', label: '1.5 Years', days: 548 },
+  // Matches the retention window; see price.schemas.ts in the API.
+  { value: '15M', label: '1Y 3M', days: 457 },
 ];
 
 interface UiState {

@@ -61,7 +61,9 @@ export interface MatchListingJob extends BaseJob {
 export type MaintenanceTask =
   | 'daily-sweep'
   | 'ensure-partitions'
-  | 'embed-backfill';
+  | 'embed-backfill'
+  /** Drops price_points partitions older than the retention window. */
+  | 'retention';
 
 export interface MaintenanceJob extends BaseJob {
   task: MaintenanceTask;

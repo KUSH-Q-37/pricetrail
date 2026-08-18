@@ -91,6 +91,12 @@ services:
       - key: SWEEP_WINDOW_MINUTES
         value: "8"
 
+      # Rolling price-history window. The daily retention job drops
+      # price_points partitions older than this. Must match the longest chart
+      # range the UI offers (15M) — see price.schemas.ts.
+      - key: PRICE_HISTORY_RETENTION_MONTHS
+        value: "15"
+
       # --- prompted at deploy time -------------------------------------------
       - key: DATABASE_URL # Supabase POOLER, port 6543, ?pgbouncer=true&connection_limit=1
         sync: false
