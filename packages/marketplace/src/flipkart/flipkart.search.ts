@@ -67,9 +67,22 @@ export function parseFlipkartSearchResults(
     // A slug that yields nothing usable is a navigational link, not a product.
     if (title.length < 3) continue;
 
+    // Rebuild a canonical URL rather than reusing the href verbatim.
+    //
+    // The href comes out of HTML, so its separators are `&amp;`. Used as-is
+    // that yields a URL whose first query parameter is named "amp;lid" and
+    // which no longer identifies the product at all. It also drags along a
+    // dozen tracking parameters (srno, otracker, iid, ssid) that encode the
+    // search session — so two users searching the same product would store two
+    // different URLs for one listing, and the stored URL would leak how it was
+    // found.
+    //
+    // Path plus pid is the entire address. Everything else is telemetry.
+    const productPath = path.split('?')[0] ?? path;
+
     candidates.push({
       externalId: fsn,
-      url: `https://www.flipkart.com${path}`,
+      url: `https://www.flipkart.com${productPath}?pid=${fsn}`,
       title,
     });
 
