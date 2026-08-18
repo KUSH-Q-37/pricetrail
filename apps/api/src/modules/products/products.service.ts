@@ -104,7 +104,18 @@ export class ProductsService {
       // lastSearchedAt is what lets retirement distinguish a product people
       // still look at from one searched once a year ago. Without it the
       // tracked set could only ever grow.
-      data: { trackingEnabled: true, lastSearchedAt: new Date() },
+      //
+      // consecutiveFailures resets too, and that pairing matters. A listing
+      // that failed five times running is auto-paused, and re-enabling it
+      // without clearing the counter revives it one failure away from pausing
+      // again — so it would stand down after a single bad fetch and look, to
+      // the user who just searched it, as though tracking simply did not work.
+      //
+      // Someone deliberately searching a URL is a strong signal it is worth
+      // another go, so it gets a full five attempts rather than the remains of
+      // an old streak. If the product really is delisted it pauses again, and
+      // the pause still means what it says.
+      data: { trackingEnabled: true, lastSearchedAt: new Date(), consecutiveFailures: 0 },
       select: { id: true, url: true },
     });
 
