@@ -16,25 +16,30 @@ import { expect, test } from '@playwright/test';
 
 const API = process.env['E2E_API_URL'] ?? 'http://localhost:3001';
 
+/**
+ * The seeded iPhone, which carries ~1,550 price points.
+ *
+ * A fixed id from the seed rather than "click the first card in a list": there
+ * is no list any more, and a test that navigated one would be asserting
+ * against whatever had most recently been searched.
+ */
+const SEEDED_PRODUCT = '00000000-0000-4000-8000-000000000010';
+
 test.describe('public access', () => {
   test('the dashboard opens with no sign-in', async ({ page }) => {
     await page.goto('/dashboard');
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   });
 
-  test('products are reachable directly', async ({ page }) => {
-    await page.goto('/products');
-    await expect(page).toHaveURL(/\/products/);
+  test('a product page is reachable directly', async ({ page }) => {
+    await page.goto(`/products/${SEEDED_PRODUCT}`);
+    await expect(page.getByRole('heading', { name: /iPhone 15 Pro/i })).toBeVisible();
   });
 });
 
 test.describe('price history chart', () => {
   test('renders the seeded product with a chart, and switches range', async ({ page }) => {
-    await page.goto('/products');
-
-    const card = page.getByRole('link', { name: /iPhone 15 Pro/i }).first();
-    await expect(card).toBeVisible();
-    await card.click();
+    await page.goto(`/products/${SEEDED_PRODUCT}`);
 
     await expect(page.getByRole('heading', { name: /iPhone 15 Pro/i })).toBeVisible();
 
@@ -65,7 +70,7 @@ test.describe('price history chart', () => {
     // non-hover way to read a value. A tooltip must never be the sole channel
     // — a keyboard or touch user cannot produce one. If these labels ever
     // disappear, the chart becomes unreadable for them and this test fails.
-    await page.goto('/compare');
+    await page.goto(`/products/${SEEDED_PRODUCT}`);
     await expect(page.locator('canvas').first()).toBeVisible({ timeout: 20_000 });
 
     const label = page.locator('p.tabular-price').first();
@@ -74,7 +79,7 @@ test.describe('price history chart', () => {
   });
 
   test('platform toggles hide and restore a series', async ({ page }) => {
-    await page.goto('/compare');
+    await page.goto(`/products/${SEEDED_PRODUCT}`);
     await expect(page.locator('canvas').first()).toBeVisible({ timeout: 20_000 });
 
     const amazonToggle = page.getByRole('button', { name: /Amazon/ }).first();
@@ -87,18 +92,20 @@ test.describe('price history chart', () => {
 });
 
 test.describe('product search', () => {
+  // The header search box does the same thing from anywhere in the app; this
+  // block exercises the dialog because it carries the error surface.
   /**
    * Every locator here is scoped to the dialog.
    *
    * A bare getByLabel('Product URL') is ambiguous: the header search box
-   * carries aria-label "Search products or paste a product URL", which
-   * substring-matches. Scoping to the dialog states the intent and is immune
-   * to a future field being added elsewhere with a similar name.
+   * carries a similar accessible name and substring-matches. Scoping to the
+   * dialog states the intent and is immune to another field being added
+   * elsewhere with a similar name.
    */
   test('rejects a URL from an unsupported marketplace with a usable message', async ({
     page,
   }) => {
-    await page.goto('/products');
+    await page.goto('/dashboard');
     await page.getByRole('button', { name: /search a product/i }).first().click();
 
     const dialog = page.getByRole('dialog');
@@ -120,7 +127,7 @@ test.describe('product search', () => {
   test('accepts a valid Amazon URL and creates a pending product', async ({ page }) => {
     const asin = `B0E2E${Date.now().toString().slice(-5)}`;
 
-    await page.goto('/products');
+    await page.goto('/dashboard');
     await page.getByRole('button', { name: /search a product/i }).first().click();
 
     const dialog = page.getByRole('dialog');
@@ -129,9 +136,12 @@ test.describe('product search', () => {
       .fill(`https://www.amazon.in/dp/${asin}`);
     await dialog.getByRole('button', { name: /^search$/i }).click();
 
-    // Dialog closes on success, and the product appears with an honest
-    // "Fetching details" state — the API never scrapes in the request path.
+    // Searching navigates to the product's own page rather than closing onto a
+    // list — there is no list. The product arrives PENDING with an honest
+    // "Fetching details" state, because the API never scrapes in the request
+    // path.
     await expect(dialog).toBeHidden({ timeout: 15_000 });
+    await expect(page).toHaveURL(/\/products\/[0-9a-f-]{36}/, { timeout: 15_000 });
     await expect(page.getByText(asin, { exact: false }).first()).toBeVisible({
       timeout: 15_000,
     });

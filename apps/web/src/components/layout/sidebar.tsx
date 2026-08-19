@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { LayoutDashboard, LineChart, Settings, TrendingUp, X } from 'lucide-react';
+import { LayoutDashboard, Settings, TrendingUp, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
@@ -15,7 +15,6 @@ import { cn } from '@/lib/utils';
 // straight to that product's history, which is the whole interaction.
 const navigation = [
   { href: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
-  { href: '/compare', label: 'Compare', Icon: LineChart },
   { href: '/settings', label: 'Settings', Icon: Settings },
 ];
 

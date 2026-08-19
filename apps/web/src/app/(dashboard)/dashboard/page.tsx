@@ -8,8 +8,7 @@ import { Alert } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useApiHealth, useApiMeta } from '@/hooks/use-api-status';
-import { useProducts } from '@/hooks/use-products';
+import { useApiHealth, usePublicStats, useApiMeta } from '@/hooks/use-api-status';
 
 const fadeUp = {
   initial: { opacity: 0, y: 8 },
@@ -54,7 +53,7 @@ function StatCard({
 export default function DashboardPage() {
   const meta = useApiMeta();
   const health = useApiHealth();
-  const products = useProducts(1, 6);
+  const stats = usePublicStats();
 
   const db = health.data?.dependencies['database'];
   const redis = health.data?.dependencies['redis'];
@@ -89,13 +88,15 @@ export default function DashboardPage() {
             className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
           >
             <StatCard
-              label="Products"
-              value={products.data ? String(products.data.total) : '—'}
+              label="Prices recorded"
+              value={stats.data ? stats.data.observations.toLocaleString('en-IN') : '—'}
               hint={
-                products.data?.total === 0 ? 'Nothing searched yet' : 'Across both platforms'
+                stats.data?.observations === 0
+                  ? 'Nothing searched yet'
+                  : `over ${stats.data?.daysTracking ?? 0} day${stats.data?.daysTracking === 1 ? '' : 's'}`
               }
               Icon={Package}
-              loading={products.isPending}
+              loading={stats.isPending}
             />
             <StatCard
               label="API"
