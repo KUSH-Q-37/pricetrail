@@ -114,7 +114,7 @@ export default function LandingPage() {
             href="/products"
             className="inline-flex h-11 items-center rounded-md border border-border px-6 text-sm font-medium transition-colors hover:bg-accent"
           >
-            Browse tracked products
+            Browse all products
           </Link>
         </div>
         </div>

@@ -6,7 +6,7 @@ export default function NotFound() {
       <p className="text-5xl font-semibold tracking-tight text-muted-foreground">404</p>
       <h1 className="text-xl font-semibold">This page does not exist</h1>
       <p className="max-w-sm text-sm text-muted-foreground">
-        The link may be broken, or the product may no longer be tracked.
+        The link may be broken, or the product may no longer exist.
       </p>
       {/*
         Styled as a button rather than wrapped in <Button>: rendering an <a>
