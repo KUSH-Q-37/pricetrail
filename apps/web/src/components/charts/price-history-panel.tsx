@@ -27,8 +27,8 @@ export function PriceHistoryPanel({ productId }: { productId: string }) {
     data?.series.reduce((sum, entry) => sum + entry.stats.missingDays, 0) ?? 0;
   const hasData = (data?.series ?? []).some((entry) => entry.stats.observedDays > 0);
 
-  // How much history actually exists, regardless of the range selected. A user
-  // who picks 1.5Y on a product we started tracking last week sees a nearly
+  // How much history actually exists, regardless of the range selected. A
+  // person who picks 15M on a product first searched last week sees a nearly
   // empty chart and reasonably assumes it is broken. Saying how much we have
   // is the difference between "no data" and "not yet".
   const observedDays = Math.max(
@@ -79,16 +79,20 @@ export function PriceHistoryPanel({ productId }: { productId: string }) {
           aria-label="Time range"
           className="flex flex-wrap gap-1 rounded-lg border border-border bg-muted/40 p-1"
         >
-          {CHART_RANGES.map(({ value, label }) => (
+          {CHART_RANGES.map(({ value, label, spoken }) => (
             <button
               key={value}
               role="radio"
               aria-checked={chartRange === value}
+              // The visible text is an abbreviation; the accessible name is the
+              // expanded form. Without this a screen reader announces "seven
+              // dee" and voice control has nothing sayable to target.
+              aria-label={spoken}
               onClick={() => setChartRange(value)}
               className={cn(
-                'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                'rounded-md px-3 py-1.5 text-xs font-medium tabular-price transition-colors duration-200',
                 chartRange === value
-                  ? 'bg-card text-foreground shadow-sm'
+                  ? 'bg-card text-foreground shadow-[var(--shadow-xs)]'
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >
@@ -143,12 +147,40 @@ export function PriceHistoryPanel({ productId }: { productId: string }) {
                         : '—'}
                     </p>
                     {entry.stats.changePercent !== null ? (
+                      // Price movement, not system status — hence the
+                      // price-down / price-up tokens rather than success and
+                      // destructive. A rise used to render muted grey, which
+                      // threw away half the information: a shopper needs to see
+                      // that a price went UP as clearly as that it fell.
+                      //
+                      // The arrow and the sign both carry it too, so the meaning
+                      // survives for a colourblind reader.
                       <p
                         className={cn(
-                          'text-xs tabular-price',
-                          entry.stats.changePercent < 0 ? 'text-success' : 'text-muted-foreground',
+                          'mt-0.5 inline-flex items-center gap-1 text-xs tabular-price',
+                          entry.stats.changePercent < 0
+                            ? 'text-price-down'
+                            : entry.stats.changePercent > 0
+                              ? 'text-price-up'
+                              : 'text-price-flat',
                         )}
                       >
+                        {entry.stats.changePercent !== 0 ? (
+                          <svg viewBox="0 0 12 12" className="size-3" aria-hidden="true">
+                            <path
+                              d={
+                                entry.stats.changePercent < 0
+                                  ? 'M6 2 v6 M3 6.5 L6 9.5 L9 6.5'
+                                  : 'M6 10 V4 M3 5.5 L6 2.5 L9 5.5'
+                              }
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        ) : null}
                         {entry.stats.changePercent > 0 ? '+' : ''}
                         {entry.stats.changePercent}% over {chartRange}
                       </p>

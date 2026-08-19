@@ -46,7 +46,7 @@ test.describe('price history chart', () => {
     // Assert on the range selector rather than the panel's title text: roles
     // and accessible names are stable, whereas a getByText on a heading is
     // brittle against markup changes and can collide with other copy.
-    await expect(page.getByRole('radio', { name: '7 Days' })).toBeVisible({
+    await expect(page.getByRole('radio', { name: '7 days' })).toBeVisible({
       timeout: 20_000,
     });
 
@@ -57,8 +57,8 @@ test.describe('price history chart', () => {
 
     // Range switch must not blank the chart — keepPreviousData holds the old
     // render while the next range loads.
-    await page.getByRole('radio', { name: '1 Year' }).click();
-    await expect(page.getByRole('radio', { name: '1 Year' })).toHaveAttribute(
+    await page.getByRole('radio', { name: '1 year' }).click();
+    await expect(page.getByRole('radio', { name: '1 year' })).toHaveAttribute(
       'aria-checked',
       'true',
     );
