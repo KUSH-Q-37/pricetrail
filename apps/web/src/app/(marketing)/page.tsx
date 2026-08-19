@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { ArrowRight, CalendarClock, LineChart, Link2, ShieldCheck } from 'lucide-react';
 
 import { HeroPriceCard } from '@/components/marketing/hero-price-card';
-import { LiveStats } from '@/components/marketing/live-stats';
 import { Reveal } from '@/components/marketing/reveal';
 
 export const metadata: Metadata = {
@@ -162,7 +161,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <LiveStats />
 
       {/* ================================================================= */}
       {/* CLOSE                                                             */}
