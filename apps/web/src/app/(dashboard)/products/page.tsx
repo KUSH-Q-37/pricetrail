@@ -41,14 +41,14 @@ export default function ProductsPage() {
       ) : data.items.length === 0 ? (
         <EmptyState
           icon={Package}
-          title="No products tracked yet"
-          description="Paste an Amazon or Flipkart product URL to start recording its price every day."
+          title="No products yet"
+          description="Paste an Amazon or Flipkart product URL. Searching it is what starts the daily price record — there is nothing else to switch on."
           action={<AddProductDialog />}
         />
       ) : (
         <>
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-medium text-muted-foreground">Tracked</h2>
+            <h2 className="text-sm font-medium text-muted-foreground">All products</h2>
             <Badge variant="secondary">{data.total}</Badge>
           </div>
 

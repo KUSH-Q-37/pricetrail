@@ -70,7 +70,7 @@ export async function LiveStats() {
           />
           <Stat
             value={stats.products.toLocaleString('en-IN')}
-            label="Products tracked"
+            label="Products followed"
           />
           <Stat
             value={stats.daysTracking.toLocaleString('en-IN')}

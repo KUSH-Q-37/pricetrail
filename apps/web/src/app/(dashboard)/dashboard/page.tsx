@@ -92,10 +92,10 @@ export default function DashboardPage() {
             className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
           >
             <StatCard
-              label="Tracked products"
+              label="Products"
               value={products.data ? String(products.data.total) : '—'}
               hint={
-                products.data?.total === 0 ? 'Nothing tracked yet' : 'Across both platforms'
+                products.data?.total === 0 ? 'Nothing searched yet' : 'Across both platforms'
               }
               Icon={Package}
               loading={products.isPending}
@@ -147,7 +147,7 @@ export default function DashboardPage() {
 
           <motion.div variants={fadeUp}>
             <div className="mb-3 flex items-center gap-2">
-              <h2 className="font-semibold">Tracked products</h2>
+              <h2 className="font-semibold">Products</h2>
               {products.data ? (
                 <Badge variant="secondary">{products.data.total}</Badge>
               ) : null}
@@ -164,8 +164,8 @@ export default function DashboardPage() {
             ) : products.data.items.length === 0 ? (
               <EmptyState
                 icon={Package}
-                title="No products tracked yet"
-                description="Paste an Amazon or Flipkart product URL. We will find the matching listing on the other marketplace and start recording prices daily."
+                title="No products yet"
+                description="Paste an Amazon or Flipkart product URL. Searching is all it takes — we record today’s price straight away, look for the same product on the other marketplace, and keep checking every day."
                 action={<AddProductDialog />}
               />
             ) : (
