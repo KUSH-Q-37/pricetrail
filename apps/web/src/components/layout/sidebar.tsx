@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { LayoutDashboard, LineChart, Package, Settings, TrendingUp, X } from 'lucide-react';
+import { LayoutDashboard, LineChart, Settings, TrendingUp, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
@@ -9,10 +9,12 @@ import { useEffect } from 'react';
 import { useUiStore } from '@/stores/ui-store';
 import { cn } from '@/lib/utils';
 
-// `/` is now the public marketing page; the dashboard moved to /dashboard.
+// `/` is the public marketing page; the dashboard moved to /dashboard.
+//
+// No Products entry. There is no list to browse — searching a URL takes you
+// straight to that product's history, which is the whole interaction.
 const navigation = [
   { href: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
-  { href: '/products', label: 'Products', Icon: Package },
   { href: '/compare', label: 'Compare', Icon: LineChart },
   { href: '/settings', label: 'Settings', Icon: Settings },
 ];

@@ -1,5 +1,7 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
+
 import { AnimatePresence, motion } from 'framer-motion';
 import { Link2, Search, X } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
@@ -10,6 +12,7 @@ import { useIngestProduct } from '@/hooks/use-products';
 import { ApiError } from '@/lib/api-client';
 
 export function AddProductDialog() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -41,7 +44,13 @@ export function AddProductDialog() {
     if (!url.trim()) return;
 
     ingest.mutate(url.trim(), {
-      onSuccess: () => close(),
+      // Go straight to the product's history. Search IS the product, so the
+      // result of searching has to be the thing you were looking for — not a
+      // closed dialog and a row somewhere for you to find.
+      onSuccess: (product) => {
+        close();
+        router.push(`/products/${product.id}`);
+      },
       // Failure deliberately leaves the dialog open with the URL intact, so a
       // typo can be corrected instead of retyped.
     });

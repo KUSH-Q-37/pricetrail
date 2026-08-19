@@ -25,12 +25,13 @@ export default function ProductDetailPage({
 
   return (
     <div className="space-y-6">
+      {/* Back to the search box, not to a list — there is no list. */}
       <Link
-        href="/products"
+        href="/dashboard"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" aria-hidden="true" />
-        Back to products
+        Search another product
       </Link>
 
       {isPending ? (

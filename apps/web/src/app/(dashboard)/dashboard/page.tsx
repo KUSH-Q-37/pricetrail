@@ -4,11 +4,8 @@ import { motion } from 'framer-motion';
 import { Activity, Database, Package, Server } from 'lucide-react';
 
 import { AddProductDialog } from '@/components/products/add-product-dialog';
-import { ProductCard } from '@/components/products/product-card';
 import { Alert } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useApiHealth, useApiMeta } from '@/hooks/use-api-status';
@@ -145,37 +142,6 @@ export default function DashboardPage() {
             </motion.div>
           ) : null}
 
-          <motion.div variants={fadeUp}>
-            <div className="mb-3 flex items-center gap-2">
-              <h2 className="font-semibold">Products</h2>
-              {products.data ? (
-                <Badge variant="secondary">{products.data.total}</Badge>
-              ) : null}
-            </div>
-
-            {products.isPending ? (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
-                {Array.from({ length: 3 }).map((_, index) => (
-                  <Skeleton key={index} className="h-44 rounded-xl" />
-                ))}
-              </div>
-            ) : products.isError ? (
-              <ErrorState error={products.error} onRetry={() => products.refetch()} />
-            ) : products.data.items.length === 0 ? (
-              <EmptyState
-                icon={Package}
-                title="No products yet"
-                description="Paste an Amazon or Flipkart product URL. Searching is all it takes — we record today’s price straight away, look for the same product on the other marketplace, and keep checking every day."
-                action={<AddProductDialog />}
-              />
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {products.data.items.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
-            )}
-          </motion.div>
         </>
       )}
     </motion.div>
