@@ -98,8 +98,6 @@ jobs:
       NODE_ENV: test
       TZ: UTC
       APP_TIMEZONE: Asia/Kolkata
-      AUTH_MODE: local-dev
-      LOCAL_DEV_AUTH_SECRET: ci-only-secret-not-used-anywhere-else-32ch
       SWAGGER_ENABLED: 'false'
 
     steps:
@@ -169,22 +167,14 @@ jobs:
       DATABASE_URL: postgresql://pricetrail:pricetrail_ci@localhost:5432/pricetrail_test?schema=public
       DIRECT_URL: postgresql://pricetrail:pricetrail_ci@localhost:5432/pricetrail_test?schema=public
       REDIS_URL: redis://localhost:6379
-      # NOT production.
-      #
-      # E2E signs in through the dev-token endpoint, and the env schema refuses
-      # to boot with AUTH_MODE=local-dev under NODE_ENV=production — by design,
-      # since that mode lets the API mint its own tokens. Setting production
-      # here and overriding it per-step did not survive, so the whole job runs
-      # as `test`: the built artefacts are identical, only the guard differs.
+      # `test` rather than production. The artefacts are identical; this only
+      # keeps Swagger and verbose errors available if a run needs inspecting.
       NODE_ENV: test
-      AUTH_MODE: local-dev
-      LOCAL_DEV_AUTH_SECRET: ci-only-secret-not-used-anywhere-else-32ch
       TZ: UTC
       APP_TIMEZONE: Asia/Kolkata
       PORT: '3001'
       CORS_ORIGINS: http://localhost:3000
       NEXT_PUBLIC_API_URL: http://localhost:3001
-      NEXT_PUBLIC_AUTH_MODE: local-dev
 
     steps:
       - uses: actions/checkout@v4

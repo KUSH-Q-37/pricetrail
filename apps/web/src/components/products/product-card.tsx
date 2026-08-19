@@ -6,7 +6,7 @@ import { useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { useUntrackProduct, type Product } from '@/hooks/use-products';
+import type { Product } from '@/hooks/use-products';
 import { formatPrice, formatRelativeTime } from '@/lib/utils';
 
 function PlatformRow({ listing }: { listing: Product['listings'][number] }) {
@@ -48,8 +48,6 @@ function PlatformRow({ listing }: { listing: Product['listings'][number] }) {
 }
 
 export function ProductCard({ product }: { product: Product }) {
-  const untrack = useUntrackProduct();
-  const [confirming, setConfirming] = useState(false);
 
   const isPending = product.status === 'PENDING';
 
@@ -74,35 +72,6 @@ export function ProductCard({ product }: { product: Product }) {
           </div>
         </div>
 
-        {confirming ? (
-          <div className="flex shrink-0 gap-1">
-            <button
-              onClick={() => untrack.mutate(product.id)}
-              disabled={untrack.isPending}
-              className="rounded-md bg-destructive px-2 py-1 text-xs font-medium text-destructive-foreground disabled:opacity-50"
-            >
-              {untrack.isPending ? 'Removing…' : 'Confirm'}
-            </button>
-            <button
-              onClick={() => setConfirming(false)}
-              className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
-            >
-              Cancel
-            </button>
-          </div>
-        ) : (
-          // "Remove from my list", not "stop tracking": removing a favourite no
-          // longer stops price collection. The product stays globally tracked
-          // because its history must keep accumulating for whoever searches it
-          // next, so a label promising to stop tracking would be untrue.
-          <button
-            onClick={() => setConfirming(true)}
-            aria-label={`Remove ${product.title} from my list`}
-            className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-          >
-            <Trash2 className="size-4" aria-hidden="true" />
-          </button>
-        )}
       </div>
 
       <div className="divide-y divide-border border-t border-border pt-1">

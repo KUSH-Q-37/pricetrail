@@ -33,9 +33,9 @@ export const DEFAULT_RETIRE_AFTER_MONTHS = 12;
  * unconditionally — so a single search revives a listing instantly, with its
  * entire history intact.
  *
- * A listing is spared if any user has favourited its product. Someone with it
- * on their dashboard is a live signal of interest regardless of whether they
- * have pasted the URL again.
+ * lastSearchedAt is the only signal left. There are no accounts, so there is
+ * no favourites list to consult — if nobody has searched a URL in a year, that
+ * is the entirety of what the system knows about who wants it.
  *
  * Set TRACKING_RETIRE_AFTER_MONTHS=0 to disable, which is the right setting
  * while the catalogue is small enough that the sweep costs nothing.
@@ -64,8 +64,6 @@ export async function retireStaleTracking(
       // pre-existing listing on first run would be the worst possible outcome
       // of adding a column. They retire naturally once searched and left alone.
       lastSearchedAt: { not: null, lt: cutoffDate },
-      // Somebody has it on their dashboard.
-      product: { trackedBy: { none: {} } },
     },
     data: { trackingEnabled: false },
   });

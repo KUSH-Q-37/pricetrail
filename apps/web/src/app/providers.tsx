@@ -5,7 +5,6 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { ThemeProvider } from 'next-themes';
 import { useState, type ReactNode } from 'react';
 
-import { AuthProvider } from '@/components/auth/auth-provider';
 import { getQueryClient } from '@/lib/query-client';
 
 /**
@@ -29,10 +28,7 @@ export function Providers({ children }: { children: ReactNode }) {
         // swap and the whole page visibly smears for ~200ms.
         disableTransitionOnChange
       >
-        {/* Inside QueryClientProvider: AuthProvider clears the query cache on
-            sign-out, so it needs the client. Inside ThemeProvider so the login
-            screen is themed like everything else. */}
-        <AuthProvider>{children}</AuthProvider>
+        {children}
       </ThemeProvider>
 
       {process.env.NODE_ENV === 'development' ? (

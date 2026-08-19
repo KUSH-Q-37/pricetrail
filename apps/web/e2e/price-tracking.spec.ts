@@ -1,57 +1,36 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 /**
  * End-to-end coverage of the flows that only had manual curl checks before.
  *
  * Everything below runs against the real stack. The value here is not
  * duplicating unit assertions — it is catching the failures that only exist
- * BETWEEN the layers: a CORS header that blocks the browser, an auth token the
- * client stores but never sends, a chart that renders zero canvases because a
- * hook threw during hydration.
+ * BETWEEN the layers: a CORS header that blocks the browser, a chart that
+ * renders zero canvases because a hook threw during hydration.
+ *
+ * There is no sign-in any more, so the whole authentication block is gone and
+ * every test opens its page directly. The one it is worth naming: a test that
+ * a signed-out visitor gets redirected would now pass for the wrong reason,
+ * because there is nothing to redirect from.
  */
 
 const API = process.env['E2E_API_URL'] ?? 'http://localhost:3001';
 
-/** The account Phase 2's seed loaded with ~1,550 price points. */
-const SEEDED_EMAIL = 'demo@pricetrail.local';
-
-async function signIn(page: Page, email = SEEDED_EMAIL): Promise<void> {
-  await page.goto('/login');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill('anything-local-dev-ignores-this');
-  await page.getByRole('button', { name: /sign in/i }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 20_000 });
-}
-
-test.describe('authentication', () => {
-  test('a signed-out visitor is redirected away from the dashboard', async ({ page }) => {
-    await page.goto('/products');
-    await page.waitForURL(/\/login/, { timeout: 15_000 });
-    await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();
-  });
-
-  test('the login form is server-rendered, not client-only', async ({ request }) => {
-    // Regression guard for the Phase 5 bug: useSearchParams pushed the whole
-    // form behind a Suspense boundary, so the static HTML contained only a
-    // skeleton and the page was unusable without JS.
-    const html = await (await request.get('/login')).text();
-    expect(html).toContain('<form');
-    expect(html).toContain('Password');
-  });
-
-  test('sign in reaches the dashboard', async ({ page }) => {
-    await signIn(page);
+test.describe('public access', () => {
+  test('the dashboard opens with no sign-in', async ({ page }) => {
+    await page.goto('/dashboard');
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  });
+
+  test('products are reachable directly', async ({ page }) => {
+    await page.goto('/products');
+    await expect(page).toHaveURL(/\/products/);
   });
 });
 
 test.describe('price history chart', () => {
-  test.beforeEach(async ({ page }) => {
-    await signIn(page);
-  });
-
   test('renders the seeded product with a chart, and switches range', async ({ page }) => {
-    await page.getByRole('link', { name: 'Products' }).click();
+    await page.goto('/products');
 
     const card = page.getByRole('link', { name: /iPhone 15 Pro/i }).first();
     await expect(card).toBeVisible();
@@ -107,11 +86,7 @@ test.describe('price history chart', () => {
   });
 });
 
-test.describe('product ingestion', () => {
-  test.beforeEach(async ({ page }) => {
-    await signIn(page, 'e2e-ingest@pricetrail.local');
-  });
-
+test.describe('product search', () => {
   /**
    * Every locator here is scoped to the dialog.
    *
@@ -124,13 +99,13 @@ test.describe('product ingestion', () => {
     page,
   }) => {
     await page.goto('/products');
-    await page.getByRole('button', { name: /track a product/i }).first().click();
+    await page.getByRole('button', { name: /search a product/i }).first().click();
 
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('textbox', { name: 'Product URL' }).fill(
       'https://www.myntra.com/product/12345',
     );
-    await dialog.getByRole('button', { name: /start tracking/i }).click();
+    await dialog.getByRole('button', { name: /^search$/i }).click();
 
     await expect(dialog.getByRole('alert')).toContainText(
       /amazon\.in and flipkart\.com/i,
@@ -146,13 +121,13 @@ test.describe('product ingestion', () => {
     const asin = `B0E2E${Date.now().toString().slice(-5)}`;
 
     await page.goto('/products');
-    await page.getByRole('button', { name: /track a product/i }).first().click();
+    await page.getByRole('button', { name: /search a product/i }).first().click();
 
     const dialog = page.getByRole('dialog');
     await dialog
       .getByRole('textbox', { name: 'Product URL' })
       .fill(`https://www.amazon.in/dp/${asin}`);
-    await dialog.getByRole('button', { name: /start tracking/i }).click();
+    await dialog.getByRole('button', { name: /^search$/i }).click();
 
     // Dialog closes on success, and the product appears with an honest
     // "Fetching details" state — the API never scrapes in the request path.
@@ -182,13 +157,27 @@ test.describe('API contract', () => {
     expect(denied.headers()['access-control-allow-origin']).toBeUndefined();
   });
 
-  test('protected routes reject an unauthenticated request', async ({ request }) => {
+  test('product routes are public and need no credentials', async ({ request }) => {
+    // The inverse of the assertion this replaced. Reads used to 401 without a
+    // bearer token; there are no accounts now, so an anonymous request must
+    // succeed — and if auth were ever reintroduced by accident, this fails.
     const response = await request.get(`${API}/api/v1/products`);
-    expect(response.status()).toBe(401);
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+    expect(Array.isArray(body.items)).toBe(true);
+  });
+
+  test('errors still use the RFC 7807 envelope', async ({ request }) => {
+    // Worth keeping separately: removing the guards must not have removed the
+    // error contract with them.
+    const response = await request.get(
+      `${API}/api/v1/products/00000000-0000-4000-8000-00000000dead`,
+    );
+    expect(response.status()).toBe(404);
 
     const problem = await response.json();
-    // RFC 7807 envelope with a stable machine code and a correlation id.
-    expect(problem.title).toBe('UNAUTHENTICATED');
+    expect(problem.title).toBe('NOT_FOUND');
     expect(problem.correlationId).toBeTruthy();
   });
 

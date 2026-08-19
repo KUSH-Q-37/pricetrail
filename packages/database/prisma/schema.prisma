@@ -125,28 +125,6 @@ enum MatchedBy {
   @@map("matched_by")
 }
 
-enum ReviewDecision {
-  CONFIRMED
-  REJECTED
-
-  @@map("review_decision")
-}
-
-enum UserRole {
-  USER
-  ADMIN
-
-  @@map("user_role")
-}
-
-enum PlanTier {
-  FREE
-  PRO
-  BUSINESS
-
-  @@map("plan_tier")
-}
-
 enum ScrapeJobStatus {
   QUEUED
   RUNNING
@@ -167,46 +145,9 @@ enum FetchStrategy {
   @@map("fetch_strategy")
 }
 
-enum AlertStatus {
-  ACTIVE
-  TRIGGERED
-  DISABLED
-
-  @@map("alert_status")
-}
-
 // ===========================================================================
 // Users
 // ===========================================================================
-
-/// Application-side user record. Credentials live in Supabase Auth
-/// (`auth.users`); this table holds only product concerns and is joined by
-/// `supabase_user_id`. We never store passwords.
-model User {
-  id             String @id @default(uuid()) @db.Uuid
-  supabaseUserId String @unique @map("supabase_user_id") @db.Uuid
-  email          String @unique @db.VarChar(320)
-
-  displayName String?  @map("display_name") @db.VarChar(120)
-  role        UserRole @default(USER)
-  planTier    PlanTier @default(FREE) @map("plan_tier")
-
-  /// Max products this user may track concurrently. Enforced by a guard in
-  /// the API, not by the database.
-  trackingQuota Int     @default(10) @map("tracking_quota")
-  notifyByEmail Boolean @default(true) @map("notify_by_email")
-
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
-
-  trackedProducts TrackedProduct[]
-  priceAlerts     PriceAlert[]
-  matchReviews    MatchReview[]
-
-  @@index([deletedAt])
-  @@map("users")
-}
 
 // ===========================================================================
 // Catalogue
@@ -244,7 +185,6 @@ model Product {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   listings  MarketplaceListing[]
-  trackedBy TrackedProduct[]
 
   @@index([brand, modelNumber])
   @@index([category])
@@ -336,7 +276,6 @@ model MarketplaceListing {
   product     Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
   pricePoints PricePoint[]
   scrapeJobs  ScrapeJob[]
-  priceAlerts PriceAlert[]
   matchesAsA  ProductMatch[] @relation("MatchListingA")
   matchesAsB  ProductMatch[] @relation("MatchListingB")
 
@@ -429,7 +368,6 @@ model ProductMatch {
 
   listingA MarketplaceListing @relation("MatchListingA", fields: [listingAId], references: [id], onDelete: Cascade)
   listingB MarketplaceListing @relation("MatchListingB", fields: [listingBId], references: [id], onDelete: Cascade)
-  reviews  MatchReview[]
 
   @@unique([listingAId, listingBId])
   @@index([listingAId])
@@ -437,71 +375,9 @@ model ProductMatch {
   @@map("product_matches")
 }
 
-/// Audit row per human decision on a match. Kept separate from
-/// product_matches so the decision history survives re-scoring, and so the
-/// confirmed/rejected set can be exported as the golden test set that Phase 9
-/// tunes the layer weights against.
-model MatchReview {
-  id         String         @id @default(uuid()) @db.Uuid
-  matchId    String         @map("match_id") @db.Uuid
-  reviewerId String         @map("reviewer_id") @db.Uuid
-  decision   ReviewDecision
-
-  /// Confidence at the moment of review, snapshotted because the match row
-  /// may be re-scored later.
-  previousConfidence Decimal @map("previous_confidence") @db.Decimal(5, 4)
-  note               String? @db.VarChar(1000)
-
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-
-  match    ProductMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  reviewer User         @relation(fields: [reviewerId], references: [id], onDelete: Restrict)
-
-  @@index([matchId, createdAt])
-  @@index([reviewerId])
-  @@map("match_reviews")
-}
-
 // ===========================================================================
 // User tracking + alerts
 // ===========================================================================
-
-model TrackedProduct {
-  id        String @id @default(uuid()) @db.Uuid
-  userId    String @map("user_id") @db.Uuid
-  productId String @map("product_id") @db.Uuid
-
-  notifyBelowMinor Int? @map("notify_below_minor")
-
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, productId])
-  @@index([productId])
-  @@map("tracked_products")
-}
-
-model PriceAlert {
-  id        String @id @default(uuid()) @db.Uuid
-  userId    String @map("user_id") @db.Uuid
-  listingId String @map("listing_id") @db.Uuid
-
-  thresholdMinor  Int         @map("threshold_minor")
-  status          AlertStatus @default(ACTIVE)
-  lastTriggeredAt DateTime?   @map("last_triggered_at") @db.Timestamptz(3)
-
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  user    User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, listingId])
-  @@index([listingId, status])
-  @@map("price_alerts")
-}
 
 // ===========================================================================
 // Operations

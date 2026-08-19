@@ -69,32 +69,6 @@ export async function mergeIntoCanonicalProduct(
   const absorbedId = aIsCanonical ? b.productId : a.productId;
 
   const movedListings = await prisma.$transaction(async (tx) => {
-    // Users who favourited the absorbed product must keep their favourite, but
-    // tracked_products is unique on (user_id, product_id) — a user who
-    // favourited BOTH products would collide on update. Move only the rows
-    // that would not collide, then delete the rest; the user keeps exactly one
-    // favourite for what is now one product.
-    const absorbedTracks = await tx.trackedProduct.findMany({
-      where: { productId: absorbedId },
-      select: { id: true, userId: true },
-    });
-
-    for (const track of absorbedTracks) {
-      const clash = await tx.trackedProduct.findUnique({
-        where: { userId_productId: { userId: track.userId, productId: canonicalId } },
-        select: { id: true },
-      });
-
-      if (clash) {
-        await tx.trackedProduct.delete({ where: { id: track.id } });
-      } else {
-        await tx.trackedProduct.update({
-          where: { id: track.id },
-          data: { productId: canonicalId },
-        });
-      }
-    }
-
     const moved = await tx.marketplaceListing.updateMany({
       where: { productId: absorbedId },
       data: { productId: canonicalId },

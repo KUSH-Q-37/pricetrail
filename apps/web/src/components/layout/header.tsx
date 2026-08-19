@@ -4,7 +4,6 @@ import { Menu, Search } from 'lucide-react';
 
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { ApiStatusPill } from '@/components/layout/api-status-pill';
-import { UserMenu } from '@/components/layout/user-menu';
 import { useUiStore } from '@/stores/ui-store';
 
 export function Header() {
@@ -37,7 +36,6 @@ export function Header() {
       <div className="ml-auto flex items-center gap-2">
         <ApiStatusPill />
         <ThemeToggle />
-        <UserMenu />
       </div>
     </header>
   );

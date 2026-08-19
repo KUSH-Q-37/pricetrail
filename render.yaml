@@ -50,10 +50,6 @@ services:
       # The OpenAPI document is a complete map of the attack surface.
       - key: SWAGGER_ENABLED
         value: "false"
-      # local-dev lets the API mint its own tokens; the env schema refuses to
-      # boot if it is combined with NODE_ENV=production.
-      - key: AUTH_MODE
-        value: supabase
       - key: RATE_LIMIT_WINDOW_SECONDS
         value: "60"
       - key: RATE_LIMIT_MAX_REQUESTS
@@ -103,8 +99,6 @@ services:
       - key: DIRECT_URL # Supabase DIRECT, port 5432 — migrations only
         sync: false
       - key: REDIS_URL # Upstash rediss:// (TLS)
-        sync: false
-      - key: SUPABASE_URL # https://<project-ref>.supabase.co
         sync: false
       - key: CORS_ORIGINS # your Vercel URL, exactly, no trailing slash
         sync: false

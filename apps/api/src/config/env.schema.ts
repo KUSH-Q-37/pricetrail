@@ -103,28 +103,6 @@ export const envSchema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
 
-  // --- Authentication -------------------------------------------------------
-  /**
-   * `supabase`  — verify RS256/ES256 tokens against the project's JWKS.
-   * `local-dev` — verify HS256 tokens this API mints itself, so the whole auth
-   *               flow is exercisable before a Supabase project exists.
-   *
-   * See the cross-field refinement below: `local-dev` is rejected outright in
-   * production.
-   */
-  AUTH_MODE: z.enum(['supabase', 'local-dev']).default('supabase'),
-
-  /** Supabase project URL, e.g. https://abcdefgh.supabase.co */
-  SUPABASE_URL: z.string().optional(),
-
-  /**
-   * Shared secret for local-dev token signing. Long enough that a leaked dev
-   * environment is not trivially forgeable.
-   */
-  LOCAL_DEV_AUTH_SECRET: z.string().min(32).optional(),
-
-  /** Access-token lifetime for locally minted dev tokens. */
-  LOCAL_DEV_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -139,33 +117,15 @@ export type Env = z.infer<typeof envSchema>;
  * a deployment checklist. A misconfigured deploy fails to start; it does not
  * quietly serve traffic with authentication disabled.
  */
-const envSchemaWithRules = envSchema.superRefine((env, ctx) => {
-  if (env.AUTH_MODE === 'local-dev' && env.NODE_ENV === 'production') {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['AUTH_MODE'],
-      message:
-        'AUTH_MODE="local-dev" is forbidden when NODE_ENV="production". ' +
-        'This mode lets the API mint its own tokens and would disable authentication entirely.',
-    });
-  }
-
-  if (env.AUTH_MODE === 'local-dev' && !env.LOCAL_DEV_AUTH_SECRET) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['LOCAL_DEV_AUTH_SECRET'],
-      message: 'Required when AUTH_MODE="local-dev" (minimum 32 characters).',
-    });
-  }
-
-  if (env.AUTH_MODE === 'supabase' && !env.SUPABASE_URL) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['SUPABASE_URL'],
-      message: 'Required when AUTH_MODE="supabase".',
-    });
-  }
-});
+/**
+ * There are no cross-field rules left.
+ *
+ * The three that lived here all guarded authentication — most importantly
+ * refusing to boot when AUTH_MODE=local-dev met NODE_ENV=production, since
+ * that combination let the API mint its own tokens. With no accounts and no
+ * guards, there is nothing left to misconfigure in that way.
+ */
+const envSchemaWithRules = envSchema;
 
 /**
  * Called by @nestjs/config at startup. Throwing here aborts the bootstrap.

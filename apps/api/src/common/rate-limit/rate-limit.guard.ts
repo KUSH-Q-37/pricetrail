@@ -5,7 +5,6 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 
 import { AppConfigService } from '../../config/app-config.service';
 import { RedisService } from '../../infra/redis/redis.service';
-import { RequestContextStore } from '../context/request-context';
 import { RateLimitedError } from '../errors/app-error';
 import {
   RATE_LIMIT_KEY,
@@ -97,16 +96,22 @@ export class RateLimitGuard implements CanActivate {
   }
 
   /**
-   * Bucket per identity per route.
+   * Bucket per IP per route.
    *
-   * Authenticated users are keyed by user id so a shared NAT or office IP does
-   * not throttle everyone at once. Anonymous callers fall back to IP, which
-   * requires `trust proxy` to be set correctly — otherwise every request
-   * appears to come from the load balancer and shares one bucket.
+   * There is no sign-in, so IP is the only identity available. It previously
+   * keyed by user id where one existed, and that branch is gone rather than
+   * left dead — it could never fire again, and reading it would suggest a
+   * fairness property this no longer has.
+   *
+   * Two consequences follow, and both matter more than they used to:
+   *
+   *  - `trust proxy` MUST be correct. Set wrongly, every request appears to
+   *    come from the load balancer and the whole internet shares one bucket.
+   *  - Everyone behind one NAT — an office, a mobile carrier — now shares a
+   *    bucket with no way to distinguish themselves by signing in.
    */
   private buildKey(request: Request, context: ExecutionContext): string {
-    const userId = RequestContextStore.get()?.userId;
-    const identity = userId ? `user:${userId}` : `ip:${request.ip ?? 'unknown'}`;
+    const identity = `ip:${request.ip ?? 'unknown'}`;
     const route = `${request.method}:${context.getClass().name}.${context.getHandler().name}`;
     return `ratelimit:${identity}:${route}`;
   }

@@ -4,7 +4,6 @@ export interface RequestContext {
   /** Correlation ID, echoed in responses and carried onto queue jobs. */
   correlationId: string;
   /** Populated by the auth guard in Phase 5. */
-  userId?: string;
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();
@@ -34,13 +33,5 @@ export const RequestContextStore = {
 
   get correlationId(): string | undefined {
     return storage.getStore()?.correlationId;
-  },
-
-  /** Attach the authenticated user to the in-flight context. */
-  setUserId(userId: string): void {
-    const context = storage.getStore();
-    if (context) {
-      context.userId = userId;
-    }
   },
 };

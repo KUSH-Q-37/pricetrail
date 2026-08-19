@@ -41,7 +41,6 @@ export interface Product {
   imageUrl: string | null;
   createdAt: string;
   listings: Listing[];
-  tracking: { notifyBelowMinor: number | null; createdAt: string } | null;
 }
 
 interface ProductPage {
@@ -85,18 +84,6 @@ export function useIngestProduct() {
       // blindly would show a duplicate row.
       void queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
       queryClient.setQueryData(queryKeys.products.detail(product.id), product);
-    },
-  });
-}
-
-export function useUntrackProduct() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (id: string) => apiClient.delete<void>(`/api/v1/products/${id}`),
-    onSuccess: (_data, id) => {
-      queryClient.removeQueries({ queryKey: queryKeys.products.detail(id) });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
     },
   });
 }

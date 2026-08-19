@@ -9,7 +9,6 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { SkipRateLimit } from '../../common/rate-limit/rate-limit.decorator';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { RedisService } from '../../infra/redis/redis.service';
-import { Public } from '../auth/decorators';
 import { isWorkerUnhealthy, workerStatus } from '../../infra/worker/worker-status';
 
 type DependencyState = 'up' | 'down';
@@ -59,9 +58,6 @@ const MAX_OBSERVATION_AGE_HOURS = 26;
  * crash-looping simultaneously.
  */
 @ApiTags('health')
-// An orchestrator's probe carries no credentials. Requiring auth here would
-// make every replica fail its readiness check and never receive traffic.
-@Public()
 @Controller({ path: 'health', version: VERSION_NEUTRAL })
 export class HealthController {
   private readonly startedAt = Date.now();

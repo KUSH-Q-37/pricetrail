@@ -105,16 +105,16 @@ export default function LandingPage() {
 
         <div className="mt-8 flex flex-wrap gap-3">
           <Link
-            href="/signup"
+            href="/dashboard"
             className="inline-flex h-11 items-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Start tracking — free
+            Search a product
           </Link>
           <Link
-            href="/login"
+            href="/products"
             className="inline-flex h-11 items-center rounded-md border border-border px-6 text-sm font-medium transition-colors hover:bg-accent"
           >
-            Sign in
+            Browse tracked products
           </Link>
         </div>
         </div>
@@ -241,14 +241,14 @@ export default function LandingPage() {
             Know the price before you pay it
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-            Create a free account, paste your first product link, and start
-            building its price history today.
+            Paste a product link and we start recording its price today. No
+            account, no sign-up — search is all there is.
           </p>
           <Link
-            href="/signup"
+            href="/dashboard"
             className="mt-7 inline-flex h-11 items-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Create a free account
+            Search a product
           </Link>
         </div>
       </section>

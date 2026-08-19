@@ -24,17 +24,13 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
 
           <nav className="ml-auto flex items-center gap-2">
             <ThemeToggle />
+            {/* No sign-in and no sign-up: there are no accounts. The one
+                action is to go and search something. */}
             <Link
-              href="/login"
-              className="rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/signup"
+              href="/dashboard"
               className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              Get started
+              Search a product
             </Link>
           </nav>
         </div>

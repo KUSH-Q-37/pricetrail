@@ -75,49 +75,6 @@ export class AppConfigService {
       .filter((origin) => origin.length > 0);
   }
 
-  get authMode(): Env['AUTH_MODE'] {
-    return this.get('AUTH_MODE');
-  }
-
-  get isLocalDevAuth(): boolean {
-    return this.authMode === 'local-dev';
-  }
-
-  /**
-   * JWKS endpoint for the Supabase project.
-   *
-   * Supabase signs access tokens with an asymmetric key and publishes the
-   * public half here. Verifying against JWKS rather than a shared HS256 secret
-   * means the API never holds a key capable of *minting* tokens — only of
-   * checking them. A leak of this service's config cannot forge a session.
-   */
-  get supabaseJwksUrl(): string {
-    const base = this.get('SUPABASE_URL');
-    if (!base) {
-      throw new Error('SUPABASE_URL is not configured');
-    }
-    return `${base.replace(/\/$/, '')}/auth/v1/.well-known/jwks.json`;
-  }
-
-  get supabaseIssuer(): string {
-    const base = this.get('SUPABASE_URL');
-    if (!base) {
-      throw new Error('SUPABASE_URL is not configured');
-    }
-    return `${base.replace(/\/$/, '')}/auth/v1`;
-  }
-
-  get localDevAuthSecret(): string {
-    const secret = this.get('LOCAL_DEV_AUTH_SECRET');
-    if (!secret) {
-      throw new Error('LOCAL_DEV_AUTH_SECRET is not configured');
-    }
-    return secret;
-  }
-
-  get localDevTokenTtlSeconds(): number {
-    return this.get('LOCAL_DEV_TOKEN_TTL_SECONDS');
-  }
 
   get rateLimit(): { windowSeconds: number; maxRequests: number } {
     return {

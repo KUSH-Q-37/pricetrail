@@ -109,34 +109,9 @@ const API_BASE_URL =
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 
-/**
- * Ambient auth wiring, installed by AuthProvider.
- *
- * Threading a token argument through every hook and query function would mean
- * each one has to remember to do it — and the one that forgets produces a 401
- * that looks like a session bug. A single registration point means auth is
- * applied uniformly and cannot be omitted by accident.
- *
- * These are module-level rather than React context because the fetch layer is
- * called from query functions that sit outside the component tree.
- */
-let tokenProvider: (() => string | null) | undefined;
-let unauthorizedHandler: (() => void) | undefined;
-
-export function setAuthTokenProvider(provider: (() => string | null) | undefined): void {
-  tokenProvider = provider;
-}
-
-/** Invoked once when the API reports the session is no longer valid. */
-export function setUnauthorizedHandler(handler: (() => void) | undefined): void {
-  unauthorizedHandler = handler;
-}
-
 export interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown;
   timeoutMs?: number;
-  /** Bearer token. Wired to the Supabase session in Phase 5. */
-  token?: string;
 }
 
 /** Build a problem document for failures that never reached the server. */
@@ -158,7 +133,7 @@ function syntheticProblem(
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { body, timeoutMs = DEFAULT_TIMEOUT_MS, token, ...init } = options;
+  const { body, timeoutMs = DEFAULT_TIMEOUT_MS,  ...init } = options;
 
   const url = `${API_BASE_URL}${path}`;
 
@@ -170,11 +145,6 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   if (body !== undefined) headers.set('Content-Type', 'application/json');
-
-  // An explicit token wins, so session-validation calls can pass a token that
-  // is not yet installed as the ambient one.
-  const bearer = token ?? tokenProvider?.();
-  if (bearer) headers.set('Authorization', `Bearer ${bearer}`);
 
   // Generated here so a failure that never reaches the server still has an ID
   // the user can quote. The API validates and echoes it back.
@@ -217,13 +187,6 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const rawBody = await response.text();
 
   if (!response.ok) {
-    // A 401 means the session the client believes it has is no longer
-    // accepted. Handled centrally so every screen reacts identically instead
-    // of each one inventing its own redirect.
-    if (response.status === 401 && !token) {
-      unauthorizedHandler?.();
-    }
-
     // Trust the envelope when it is there; synthesize one when it is not.
     // A 502 from a load balancer returns HTML, and JSON.parse on that would
     // throw a parse error that hides the real status code.

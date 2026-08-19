@@ -2,7 +2,6 @@
  * Development seed.
  *
  * Produces enough realistic data to build against before any scraper exists:
- *   - an admin and a regular user
  *   - two products spanning both category families (electronics + appliances)
  *   - Amazon and Flipkart listings for each
  *   - ~400 days of daily price history, so every chart range (7D through 1.5Y)
@@ -26,8 +25,6 @@ import {
   ProductStatus,
   MatchStatus,
   MatchedBy,
-  UserRole,
-  PlanTier,
 } from '../generated/client';
 
 const prisma = new PrismaClient();
@@ -37,8 +34,6 @@ const PIPELINE_VERSION = 'seed-0';
 
 // Fixed UUIDs so re-seeding updates rather than duplicates.
 const IDS = {
-  adminUser: '00000000-0000-4000-8000-000000000001',
-  demoUser: '00000000-0000-4000-8000-000000000002',
   phone: '00000000-0000-4000-8000-000000000010',
   fridge: '00000000-0000-4000-8000-000000000011',
   phoneAmazon: '00000000-0000-4000-8000-000000000020',
@@ -128,35 +123,6 @@ function generateHistory(
 
 async function main(): Promise<void> {
   console.log('seeding...');
-
-  // --- users ---------------------------------------------------------------
-  await prisma.user.upsert({
-    where: { id: IDS.adminUser },
-    update: {},
-    create: {
-      id: IDS.adminUser,
-      supabaseUserId: IDS.adminUser,
-      email: 'admin@pricetrail.local',
-      displayName: 'Seed Admin',
-      role: UserRole.ADMIN,
-      planTier: PlanTier.BUSINESS,
-      trackingQuota: 1000,
-    },
-  });
-
-  await prisma.user.upsert({
-    where: { id: IDS.demoUser },
-    update: {},
-    create: {
-      id: IDS.demoUser,
-      supabaseUserId: IDS.demoUser,
-      email: 'demo@pricetrail.local',
-      displayName: 'Demo User',
-      role: UserRole.USER,
-      planTier: PlanTier.FREE,
-      trackingQuota: 10,
-    },
-  });
 
   // --- products ------------------------------------------------------------
   await prisma.product.upsert({
@@ -415,16 +381,9 @@ async function main(): Promise<void> {
   }
 
   // --- tracking ------------------------------------------------------------
-  for (const productId of [IDS.phone, IDS.fridge]) {
-    await prisma.trackedProduct.upsert({
-      where: { userId_productId: { userId: IDS.demoUser, productId } },
-      update: {},
-      create: { userId: IDS.demoUser, productId },
-    });
-  }
 
   console.log(
-    `seeded: 2 users, 2 products, ${listings.length} listings, ` +
+    `seeded: 2 products, ${listings.length} listings, ` +
       `${totalPoints} price points, ${pairs.length} matches`,
   );
 }

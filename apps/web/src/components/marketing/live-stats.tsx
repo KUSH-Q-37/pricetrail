@@ -1,5 +1,5 @@
 /**
- * Real counts from the API, rendered on the marketing page.
+ * Real counts from the API, rendered on the landing page.
  *
  * An async server component, so the numbers are in the HTML rather than
  * appearing after hydration — a figure that pops in a second late reads as
@@ -7,21 +7,10 @@
  */
 
 interface PublicStats {
-  users: number;
   products: number;
   observations: number;
   daysTracking: number;
 }
-
-/**
- * Minimum accounts before the user count is shown.
- *
- * Set to 0 at the owner's request: the count is always displayed. The knob is
- * kept rather than deleted because the reason for it still holds — a small
- * number here reads as evidence against the product, and raising this is the
- * one-line way to hide it again if that becomes a concern.
- */
-const USER_COUNT_FLOOR = 0;
 
 async function fetchStats(): Promise<PublicStats | null> {
   const base = process.env['NEXT_PUBLIC_API_URL'];
@@ -61,24 +50,37 @@ function Stat({ value, label }: { value: string; label: string }) {
 export async function LiveStats() {
   const stats = await fetchStats();
 
-  // No stats, or no accounts yet — render nothing rather than a zero. A zero
-  // is a true number that tells a false story.
-  if (!stats || stats.users === 0) return null;
+  // No stats, or nothing recorded yet — render nothing rather than a row of
+  // zeroes. A zero is a true number that tells a false story.
+  if (!stats || stats.observations === 0) return null;
 
   return (
     <section className="border-t border-border bg-muted/20">
       <div className="mx-auto w-full max-w-7xl px-4 py-14">
-        <div className="text-center">
-          <p className="text-5xl font-semibold tabular-nums tracking-tight sm:text-6xl">
-            {stats.users.toLocaleString('en-IN')}
-          </p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Registered user{stats.users === 1 ? '' : 's'}
-          </p>
+        <div className="grid grid-cols-1 gap-8 text-center sm:grid-cols-3">
+          {/* Observations leads deliberately: it only ever goes up, and it is
+              the number that says "this has been running", which is the claim
+              a price tracker actually needs to make.
+
+              The registered-user count that used to sit here is gone with the
+              accounts — there is no sign-in, so there is nobody to count. */}
+          <Stat
+            value={stats.observations.toLocaleString('en-IN')}
+            label={`Price${stats.observations === 1 ? '' : 's'} recorded`}
+          />
+          <Stat
+            value={stats.products.toLocaleString('en-IN')}
+            label="Products tracked"
+          />
+          <Stat
+            value={stats.daysTracking.toLocaleString('en-IN')}
+            label={`Day${stats.daysTracking === 1 ? '' : 's'} of history`}
+          />
         </div>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          Live from our database, updated hourly.
+          Live from our database, updated hourly. Every recorded price is an
+          observation we made ourselves — none are estimated.
         </p>
       </div>
     </section>

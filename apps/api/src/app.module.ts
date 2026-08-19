@@ -10,9 +10,6 @@ import { AppConfigModule } from './config/config.module';
 import { PrismaModule } from './infra/prisma/prisma.module';
 import { QueueModule } from './infra/queue/queue.module';
 import { RedisModule } from './infra/redis/redis.module';
-import { AuthModule } from './modules/auth/auth.module';
-import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
-import { RolesGuard } from './modules/auth/roles.guard';
 import { HealthModule } from './modules/health/health.module';
 import { MetaModule } from './modules/meta/meta.module';
 import { StatsModule } from './modules/stats/stats.module';
@@ -50,7 +47,6 @@ import { ProductsModule } from './modules/products/products.module';
 
           customProps: () => ({
             correlationId: RequestContextStore.correlationId,
-            userId: RequestContextStore.get()?.userId,
           }),
 
           // Probes fire every few seconds. Logging them buries real traffic.
@@ -78,7 +74,6 @@ import { ProductsModule } from './modules/products/products.module';
     PrismaModule,
     RedisModule,
     QueueModule,
-    AuthModule,
     HealthModule,
     MetaModule,
     ProductsModule,
@@ -90,18 +85,13 @@ import { ProductsModule } from './modules/products/products.module';
     // participates in DI and can inject the logger.
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
 
-    // ORDER IS SIGNIFICANT. Nest runs global guards in registration order.
+    // The only guard left. There is no sign-in, so there is no identity to
+    // authenticate and nothing to authorise against — every route is public
+    // and rate limiting buckets by IP for everyone.
     //
-    //   1. JwtAuthGuard   authenticates and populates request.user and the
-    //                     ambient userId
-    //   2. RolesGuard     authorizes, reading the role JwtAuthGuard resolved
-    //   3. RateLimitGuard buckets by userId when present, IP otherwise
-    //
-    // Moving RateLimitGuard first would silently downgrade every authenticated
-    // caller to an IP-keyed bucket — so everyone behind one office NAT or
-    // mobile carrier gateway would share a single quota.
-    { provide: APP_GUARD, useClass: JwtAuthGuard },
-    { provide: APP_GUARD, useClass: RolesGuard },
+    // That makes this guard the ONLY thing standing between the internet and
+    // POST /products/ingest, which enrols a product in daily fetching forever.
+    // Its limits are the abuse budget now, not a politeness measure.
     { provide: APP_GUARD, useClass: RateLimitGuard },
   ],
 })

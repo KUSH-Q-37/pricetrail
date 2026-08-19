@@ -11,11 +11,9 @@ import {
   AppError,
   ErrorCode,
   NotFoundError,
-  QuotaExceededError,
 } from '../../common/errors/app-error';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { QueueService } from '../../infra/queue/queue.service';
-import type { AuthenticatedUser } from '../auth/auth.service';
 import type { ListProductsQuery } from './product.schemas';
 
 /** Shape returned to clients. Deliberately narrower than the DB row. */
@@ -45,7 +43,6 @@ export interface ProductSummary {
     lastSuccessAt: Date | null;
     consecutiveFailures: number;
   }>;
-  tracking: { notifyBelowMinor: number | null; createdAt: Date } | null;
 }
 
 @Injectable()
@@ -57,7 +54,7 @@ export class ProductsService {
   ) {}
 
   /**
-   * Ingest a marketplace URL and start tracking it for this user.
+   * Search a marketplace URL. Finding it is what starts tracking it.
    *
    * Idempotent by construction. `(platform, external_id)` is unique, so
    * pasting the same URL twice — or two users adding the same product —
@@ -66,7 +63,7 @@ export class ProductsService {
    * separately every day, doubling the fetch budget for one product and
    * splitting its price history across two rows.
    */
-  async ingestByUrl(user: AuthenticatedUser, rawUrl: string): Promise<ProductSummary> {
+  async ingestByUrl(rawUrl: string): Promise<ProductSummary> {
     const parsed = this.parseOrThrow(rawUrl);
 
     const existing = await this.prisma.marketplaceListing.findUnique({
@@ -91,9 +88,8 @@ export class ProductsService {
     // untracked no matter how many people searched it, and the daily sweep
     // skipped it forever.
     //
-    // Done before the per-user write, and independently of it, so a quota
-    // rejection or a failure to record someone's favourite cannot stop the
-    // system collecting prices for a product it now knows about.
+    // Unconditional, because there is no longer any per-user state that could
+    // qualify it. Searching a URL is the whole enrolment.
     const listing = await this.prisma.marketplaceListing.update({
       where: {
         platform_externalId: {
@@ -118,8 +114,6 @@ export class ProductsService {
       data: { trackingEnabled: true, lastSearchedAt: new Date(), consecutiveFailures: 0 },
       select: { id: true, url: true },
     });
-
-    await this.trackForUser(user, productId);
 
     // Collect today's observation now rather than waiting for the 02:00 sweep.
     //
@@ -147,7 +141,7 @@ export class ProductsService {
       });
     }
 
-    const summary = await this.findById(user, productId);
+    const summary = await this.findById(productId);
 
     this.logger.info(
       {
@@ -219,35 +213,10 @@ export class ProductsService {
     }
   }
 
-  /** Enforce quota, then record the user→product link. */
-  private async trackForUser(user: AuthenticatedUser, productId: string): Promise<void> {
-    const already = await this.prisma.trackedProduct.findUnique({
-      where: { userId_productId: { userId: user.id, productId } },
-      select: { id: true },
-    });
-
-    // Re-adding something already tracked must not consume quota.
-    if (already) return;
-
-    const tracked = await this.prisma.trackedProduct.count({
-      where: { userId: user.id },
-    });
-
-    if (tracked >= user.trackingQuota) {
-      throw new QuotaExceededError(user.trackingQuota);
-    }
-
-    await this.prisma.trackedProduct.create({
-      data: { userId: user.id, productId },
-    });
-  }
-
   async list(
-    user: AuthenticatedUser,
     query: ListProductsQuery,
   ): Promise<{ items: ProductSummary[]; total: number; page: number; pageSize: number }> {
     const where: Prisma.ProductWhereInput = {
-      trackedBy: { some: { userId: user.id } },
       ...(query.search
         ? { normalizedTitle: { contains: query.search.toLowerCase() } }
         : {}),
@@ -263,7 +232,6 @@ export class ProductsService {
         take: query.pageSize,
         include: {
           listings: { orderBy: { platform: 'asc' } },
-          trackedBy: { where: { userId: user.id } },
         },
       }),
     ]);
@@ -276,64 +244,17 @@ export class ProductsService {
     };
   }
 
-  async findById(user: AuthenticatedUser, productId: string): Promise<ProductSummary> {
+  async findById(productId: string): Promise<ProductSummary> {
     const product = await this.prisma.product.findFirst({
-      // Scoped by ownership in the query itself rather than fetched and then
-      // checked. A forgotten post-hoc check is an IDOR; a missing `where`
-      // clause is visible in review.
-      where: { id: productId, trackedBy: { some: { userId: user.id } } },
+      where: { id: productId },
       include: {
         listings: { orderBy: { platform: 'asc' } },
-        trackedBy: { where: { userId: user.id } },
       },
     });
 
     if (!product) throw new NotFoundError('Product', productId);
 
     return this.toSummary(product);
-  }
-
-  /**
-   * Remove this user's favourite. Global price collection is unaffected.
-   *
-   * This used to switch trackingEnabled off across the product's listings once
-   * the last favourite was removed, on the reasoning that nobody was watching
-   * so nobody should pay to fetch it. That reasoning no longer holds: a
-   * searched product is globally tracked precisely so its history keeps
-   * accumulating for whoever searches it next, and history is the one thing
-   * that cannot be reconstructed later. One user tidying their list would have
-   * silently ended collection for everybody, and the gap would be permanent.
-   *
-   * The consequence is deliberate and worth stating: the globally tracked set
-   * only ever grows. Retention bounds storage, not fetch volume. If daily fetch
-   * cost becomes the binding constraint, the answer is an explicit policy —
-   * retiring listings that have gone unviewed for N months, say — and not the
-   * side effect of somebody unfavouriting something.
-   */
-  async untrack(user: AuthenticatedUser, productId: string): Promise<void> {
-    const result = await this.prisma.trackedProduct.deleteMany({
-      where: { userId: user.id, productId },
-    });
-
-    if (result.count === 0) throw new NotFoundError('Tracked product', productId);
-
-    // Deliberately nothing else. See the note above: global collection is not
-    // a function of who has favourited the product.
-  }
-
-  async setNotifyThreshold(
-    user: AuthenticatedUser,
-    productId: string,
-    notifyBelowMinor: number | null,
-  ): Promise<ProductSummary> {
-    const result = await this.prisma.trackedProduct.updateMany({
-      where: { userId: user.id, productId },
-      data: { notifyBelowMinor },
-    });
-
-    if (result.count === 0) throw new NotFoundError('Tracked product', productId);
-
-    return this.findById(user, productId);
   }
 
   private parseOrThrow(rawUrl: string): ParsedMarketplaceUrl {
@@ -358,10 +279,9 @@ export class ProductsService {
 
   private toSummary(
     product: Prisma.ProductGetPayload<{
-      include: { listings: true; trackedBy: true };
+      include: { listings: true };
     }>,
   ): ProductSummary {
-    const tracking = product.trackedBy[0];
 
     return {
       id: product.id,
@@ -391,9 +311,6 @@ export class ProductsService {
         lastSuccessAt: listing.lastSuccessAt,
         consecutiveFailures: listing.consecutiveFailures,
       })),
-      tracking: tracking
-        ? { notifyBelowMinor: tracking.notifyBelowMinor, createdAt: tracking.createdAt }
-        : null,
     };
   }
 }

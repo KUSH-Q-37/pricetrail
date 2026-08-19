@@ -1,12 +1,9 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
-import { Public } from '../auth/decorators';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 
 export interface PublicStats {
-  /** Registered accounts. The landing page hides this below a floor. */
-  users: number;
   /** Products with at least one successfully fetched listing. */
   products: number;
   /** Individual daily price observations recorded, ever. */
@@ -33,7 +30,6 @@ export class StatsController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
-  @Public()
   @ApiOperation({ summary: 'Aggregate public counts for the marketing page' })
   @ApiOkResponse({ description: 'Cached up to five minutes.' })
   async getStats(): Promise<PublicStats> {
@@ -41,8 +37,7 @@ export class StatsController {
       return this.cache.data;
     }
 
-    const [users, products, observations, earliest] = await Promise.all([
-      this.prisma.user.count(),
+    const [products, observations, earliest] = await Promise.all([
       // READY only. A product still being fetched is not something to boast
       // about, and counting it would make the number jump around as the
       // pipeline runs.
@@ -63,7 +58,7 @@ export class StatsController {
         )
       : 0;
 
-    const data: PublicStats = { users, products, observations, daysTracking };
+    const data: PublicStats = { products, observations, daysTracking };
     this.cache = { data, expires: Date.now() + StatsController.TTL_MS };
     return data;
   }

@@ -1,9 +1,9 @@
+import { businessDate, businessDateMinusDays } from '@pricetrail/database';
 import { Injectable } from '@nestjs/common';
 import type { Platform } from '@pricetrail/database';
 
 import { NotFoundError } from '../../common/errors/app-error';
 import { PrismaService } from '../../infra/prisma/prisma.service';
-import type { AuthenticatedUser } from '../auth/auth.service';
 import { downsampleWithGaps, type SeriesPoint } from './downsample';
 import { RANGE_DAYS, type ChartRange } from './price.schemas';
 
@@ -41,14 +41,12 @@ export class PricesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getHistory(
-    user: AuthenticatedUser,
     productId: string,
     range: ChartRange,
     platformFilter?: string,
   ): Promise<HistoryResponse> {
-    // Ownership enforced in the query, never post-hoc. Same rule as Phase 6.
     const product = await this.prisma.product.findFirst({
-      where: { id: productId, trackedBy: { some: { userId: user.id } } },
+      where: { id: productId },
       select: { id: true, listings: { select: { id: true, platform: true, currency: true } } },
     });
     if (!product) throw new NotFoundError('Product', productId);
@@ -58,9 +56,12 @@ export class PricesService {
     // Bounded on BOTH ends. Phase 2 §8.6: `captured_on >= $from` prunes only
     // past partitions, leaving every future one in the plan. BETWEEN prunes
     // both ends — this is the difference between scanning 2 partitions and 31.
-    const to = startOfUtcDay(new Date());
-    const from = new Date(to);
-    from.setUTCDate(from.getUTCDate() - (days - 1));
+    // Business dates, not UTC days. captured_on is bucketed in Asia/Kolkata,
+    // so a UTC-derived window is offset by 5.5 hours against the rows it is
+    // selecting — which drops today's observation for anyone querying before
+    // 05:30 IST and silently shifts every range by a day.
+    const to = businessDate();
+    const from = businessDateMinusDays(days - 1);
 
     const wanted = new Set(
       (platformFilter ?? '')

@@ -2,7 +2,6 @@ import { Controller, Get, NotFoundException, Param } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { AppConfigService } from '../../config/app-config.service';
-import { Public } from '../auth/decorators';
 
 /**
  * Service metadata for clients.
@@ -17,7 +16,6 @@ import { Public } from '../auth/decorators';
 @ApiTags('meta')
 // Version and timezone are needed by the login screen itself, before any
 // session exists. Nothing here is user-specific.
-@Public()
 @Controller({ path: 'meta', version: '1' })
 export class MetaController {
   constructor(private readonly config: AppConfigService) {}
