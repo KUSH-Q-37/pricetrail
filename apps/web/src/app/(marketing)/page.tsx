@@ -103,18 +103,16 @@ export default function LandingPage() {
           the difference between a genuine drop and a marketing number.
         </p>
 
-        <div className="mt-8 flex flex-wrap gap-3">
+        {/* One action, deliberately. A second button offering to browse what
+            other people had searched competed with the thing this page is for
+            — and browsing a catalogue is not the product. Searching is.
+            /products still exists and is reachable from the sidebar. */}
+        <div className="mt-8">
           <Link
             href="/dashboard"
             className="inline-flex h-11 items-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Search a product
-          </Link>
-          <Link
-            href="/products"
-            className="inline-flex h-11 items-center rounded-md border border-border px-6 text-sm font-medium transition-colors hover:bg-accent"
-          >
-            Browse all products
           </Link>
         </div>
         </div>
