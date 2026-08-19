@@ -203,28 +203,48 @@ export async function scrapeListing(
 
     if (product.priceMinor === undefined) return false;
 
-    // Append-only, at most one row per listing per day. `skipDuplicates`
-    // makes a same-day re-run a no-op instead of a primary-key violation —
-    // which matters because BullMQ WILL redeliver a job whose worker died
-    // after the write but before the ack.
-    const result = await tx.pricePoint.createMany({
-      data: [
-        {
-          listingId: input.listingId,
-          capturedOn,
-          capturedAt: finishedAt,
-          currency: product.currency,
-          priceMinor: product.priceMinor,
-          mrpMinor: product.mrpMinor ?? null,
-          discountPercent: product.discountPercent ?? null,
-          availability: product.availability as Availability,
-          source: product.source as DataSource,
-        },
-      ],
-      skipDuplicates: true,
+    // At most one row per listing per day, holding the LATEST observation of
+    // that day.
+    //
+    // This was createMany + skipDuplicates, which kept the FIRST observation
+    // and silently discarded any later one. The listing's denormalised
+    // current_price_minor is written unconditionally a few lines above, so a
+    // second scrape in the same day moved the card and left the day's record
+    // behind — and the product detail page then showed two different "current"
+    // prices for one listing, one on the card and one at the end of the chart.
+    //
+    // For a product whose entire claim is "we record what things actually
+    // cost", disagreeing with itself on one screen is the worst kind of bug.
+    //
+    // An upsert is still safe against the redelivery the old comment worried
+    // about: BullMQ will redeliver a job whose worker died after the write but
+    // before the ack, and re-applying the same values is a no-op rather than a
+    // primary-key violation.
+    const payload = {
+      capturedAt: finishedAt,
+      currency: product.currency,
+      priceMinor: product.priceMinor,
+      mrpMinor: product.mrpMinor ?? null,
+      discountPercent: product.discountPercent ?? null,
+      availability: product.availability as Availability,
+      source: product.source as DataSource,
+    };
+
+    const before = await tx.pricePoint.findUnique({
+      where: { listingId_capturedOn: { listingId: input.listingId, capturedOn } },
+      select: { priceMinor: true },
     });
 
-    return result.count > 0;
+    await tx.pricePoint.upsert({
+      where: { listingId_capturedOn: { listingId: input.listingId, capturedOn } },
+      create: { listingId: input.listingId, capturedOn, ...payload },
+      update: payload,
+    });
+
+    // "Did today's record change?" — true for a first observation, and for a
+    // later one that moved the price. A re-run returning the same number is
+    // not news and should not read as one.
+    return before === null || before.priceMinor !== product.priceMinor;
   });
 
   await prisma.scrapeJob.update({
