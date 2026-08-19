@@ -202,7 +202,22 @@ jobs:
       - run: pnpm --filter @pricetrail/database migrate:deploy
       - run: pnpm --filter @pricetrail/database seed
 
-      - run: pnpm --filter @pricetrail/web exec playwright install --with-deps chromium
+      # `--with-deps` shells out to apt-get, and the runner's Azure Ubuntu
+      # mirror intermittently stops answering — apt then retries against the
+      # fallback mirror for as long as anything lets it. One run sat in this
+      # step for 1h51m before it was cancelled.
+      #
+      # The browser download itself is reliable; only the apt half is not. So
+      # cap the step, and if the system-deps half fails, fall back to the plain
+      # install: ubuntu-latest already ships nearly everything Chromium links
+      # against. If the fallback genuinely is not enough, the e2e step below
+      # fails with a real browser error, which is a far better outcome than a
+      # job that hangs.
+      - name: Install Playwright chromium
+        timeout-minutes: 12
+        run: |
+          pnpm --filter @pricetrail/web exec playwright install --with-deps chromium ||
+            pnpm --filter @pricetrail/web exec playwright install chromium
 
       # Logs are dumped inside this step, not a later `if: failure()` one.
       #

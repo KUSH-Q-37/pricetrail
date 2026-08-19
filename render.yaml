@@ -34,7 +34,22 @@ services:
     # "EROFS: read-only file system, unlink '/usr/bin/pnpm'".
     # A global npm install writes to a path the build user owns.
     buildCommand: npm i -g pnpm@11.20.0 && pnpm install --frozen-lockfile && pnpm --filter @pricetrail/database generate && pnpm build
-    startCommand: node apps/api/dist/main.js
+    # Migrations run here, not in buildCommand and not by hand.
+    #
+    # Nothing in this file ever ran `migrate deploy`, so the database only
+    # advanced when someone remembered to run it from a laptop. It drifted:
+    # ingest started writing marketplace_listings.lastSearchedAt while
+    # production had no such column, and every product search returned a 500.
+    #
+    # Start, not build: a build produces artefacts and should not need database
+    # credentials, and a migration that fails here stops the service from
+    # coming up rather than letting it serve errors against a schema it does
+    # not match. The API runs it; the worker deliberately does not, so two
+    # services never race for the migration lock.
+    #
+    # `exec prisma` rather than the migrate:deploy script — that script wraps
+    # prisma in `dotenv -e ../../.env`, and there is no .env file on Render.
+    startCommand: pnpm --filter @pricetrail/database exec prisma migrate deploy && node apps/api/dist/main.js
 
     healthCheckPath: /health/live
 
