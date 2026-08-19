@@ -99,7 +99,7 @@ export interface FetchStrategy {
  * This interface is the reason the Phase 1 decision to go API-first was a
  * configuration change rather than a rewrite. Callers — the ingest service,
  * the daily worker, the matching pipeline — never learn whether a price came
- * from PA-API or from a headless browser. If Amazon revokes API access
+ * from the Creators API or from a headless browser. If Amazon revokes API access
  * tomorrow, the scraping strategy is already the full implementation and gets
  * promoted; nothing above this line changes.
  */

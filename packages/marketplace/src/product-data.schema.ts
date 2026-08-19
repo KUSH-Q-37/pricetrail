@@ -5,7 +5,7 @@ import { MAX_PRICE_MINOR } from './shared/price';
 /**
  * THE BOUNDARY.
  *
- * Everything a fetcher produces — whether from PA-API, a plain HTTP fetch, or
+ * Everything a fetcher produces — whether from the Creators API, a plain HTTP fetch, or
  * a headless browser — must pass this schema before it touches the database.
  *
  * This is the single most important validation in the system, and it is not

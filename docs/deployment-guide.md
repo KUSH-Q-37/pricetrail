@@ -1,10 +1,10 @@
 # Deployment guide
 
 Goal: a **public HTTPS URL** — which is what Amazon Associates requires before
-you can apply for PA-API access.
+you can apply for Creators API access.
 
 ```
-Deploy  →  live URL  →  Amazon Associates  →  PA-API keys  →  live Amazon data
+Deploy  →  live URL  →  Amazon Associates  →  Creators API  →  live Amazon data
 ```
 
 Docker is deliberately NOT on this path. Railway and Render build Node
@@ -176,29 +176,58 @@ the worker fetches it.
 
 ---
 
-## STEP 8 — Amazon Associates → PA-API
+## STEP 8 — Amazon Associates → Creators API
 
 Now you have the URL Amazon asks for.
+
+**The Product Advertising API (PA-API) was retired on 15 May 2026.** It is
+closed to new applicants; the Creators API replaces it. Any older guide telling
+you to request PA-API access is out of date.
 
 1. **affiliate-program.amazon.in** → sign up
 2. Enter your **Vercel URL** as your website
 3. Describe the site honestly: a price-comparison and price-history tracker for
    Indian marketplaces
-4. Once approved: **Tools → Product Advertising API → Request access**
-5. Generate credentials and add to the **Railway API and worker** services:
+4. Once approved: **Associates Central → Tools → Creators API**
+5. Create a credential. Amazon shows the **client secret exactly once** — copy
+   it immediately, it cannot be retrieved later.
+6. Add all four to the **Render API and worker** services:
 
 ```
-PAAPI_ACCESS_KEY=...
-PAAPI_SECRET_KEY=...
-PAAPI_PARTNER_TAG=...
+AMAZON_CREATORS_CLIENT_ID=amzn1.application-oa2-client....
+AMAZON_CREATORS_CLIENT_SECRET=amzn1.oa2-cs.v1....
+AMAZON_CREATORS_PARTNER_TAG=yourstore-21
+AMAZON_CREATORS_VERSION=v3.2
 ```
 
 No code changes — the adapter picks the API path automatically once these
-exist.
+exist, and logs `amazonCreatorsApi: true` at boot so you can confirm it.
 
-⚠️ **Amazon requires 3 qualifying sales within 180 days** to retain PA-API
-access. If it lapses, the scraping fallback is already implemented and simply
-becomes primary again.
+### Two things that will cost you an afternoon
+
+**India is v3.2 (EU), not Far East.** Amazon groups amazon.in with the European
+marketplaces; Far East is only JP, SG and AU. The version is stamped on your
+credential and decides which host issues your OAuth token:
+
+| Version | Token host | Marketplaces |
+|---|---|---|
+| v3.1 | `api.amazon.com` | US, CA, MX, BR |
+| **v3.2** | **`api.amazon.co.uk`** | UK, DE, FR, IT, ES, NL, BE, EG, **IN**, IE, PL, SA, SE, TR, AE |
+| v3.3 | `api.amazon.co.jp` | JP, SG, AU |
+
+Sending a v3.2 credential to the wrong host returns `invalid_client`, which
+looks exactly like a wrong secret. If unset, the code defaults to v3.2.
+
+**`AMAZON_CREATORS_PARTNER_TAG` is your real store ID**, from Associates
+Central → *Manage Your Tracking IDs*. It must belong to the same account that
+issued the credentials, or every call is rejected.
+
+⚠️ **Amazon requires qualifying sales to retain access** (the current threshold
+is published in Associates Central and has changed more than once). If access
+lapses or is never granted, the scraping fallback is already implemented and
+simply becomes primary again — though note that Amazon.in currently answers
+every scrape with a bot challenge, so in practice Amazon coverage depends on
+these credentials. Flipkart is unaffected.
 
 ---
 

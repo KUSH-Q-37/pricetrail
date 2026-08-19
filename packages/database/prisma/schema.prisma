@@ -211,7 +211,7 @@ model MarketplaceListing {
   brand           String? @db.VarChar(120)
 
   // --- Identifiers: matching Layer 1 reads these -------------------------
-  // PA-API returns Brand / Model / PartNumber / EAN / UPC as structured
+  // The Creators API returns Brand / Model / PartNumber / EAN / UPC as structured
   // fields, so on the API path these are reliable rather than regex-guessed.
   modelNumber String? @map("model_number") @db.VarChar(120)
   mpn         String? @db.VarChar(120)

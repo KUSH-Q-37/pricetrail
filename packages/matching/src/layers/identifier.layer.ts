@@ -17,7 +17,7 @@ export interface IdentifierAnalysis extends LayerResult {
  * product, full stop.
  *
  * This layer became substantially more reliable with the Phase 1 decision to
- * go API-first: PA-API returns Brand, Model, PartNumber, EAN and UPC as
+ * go API-first: the Creators API returns Brand, Model, PartNumber, EAN and UPC as
  * STRUCTURED fields, so on the API path these are read rather than guessed
  * out of a spec table.
  */

@@ -31,7 +31,7 @@ export interface SweepResult {
  *    attack and gets the whole IP range blocked within minutes. Each job gets
  *    a random delay spread across a multi-hour window so the load is flat.
  *
- * The window is deliberately configurable: on the PA-API path, GetItems
+ * The window is deliberately configurable: on the Creators API path, getItems
  * batches 10 ASINs per call and the whole sweep fits in ~17 minutes, so a
  * 6-hour spread would be pointlessly slow.
  */

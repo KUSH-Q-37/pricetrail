@@ -103,12 +103,19 @@ services:
       - key: CORS_ORIGINS # your Vercel URL, exactly, no trailing slash
         sync: false
 
-      # --- add once Amazon Associates approves you ---------------------------
-      - key: PAAPI_ACCESS_KEY
+      # --- add once Amazon Associates issues Creators API credentials --------
+      # PA-API was retired on 15 May 2026; these replace it. Credentials
+      # require an approved Associates account with qualifying sales.
+      # AMAZON_CREATORS_VERSION is stamped on the credential by Amazon and
+      # selects the OAuth token host — amazon.in is v3.2 (EU), which is also
+      # the default if unset.
+      - key: AMAZON_CREATORS_CLIENT_ID
         sync: false
-      - key: PAAPI_SECRET_KEY
+      - key: AMAZON_CREATORS_CLIENT_SECRET
         sync: false
-      - key: PAAPI_PARTNER_TAG
+      - key: AMAZON_CREATORS_PARTNER_TAG
+        sync: false
+      - key: AMAZON_CREATORS_VERSION
         sync: false
 
   # ---------------------------------------------------------------------------
@@ -155,9 +162,11 @@ services:
         sync: false
       - key: REDIS_URL
         sync: false
-      - key: PAAPI_ACCESS_KEY
+      - key: AMAZON_CREATORS_CLIENT_ID
         sync: false
-      - key: PAAPI_SECRET_KEY
+      - key: AMAZON_CREATORS_CLIENT_SECRET
         sync: false
-      - key: PAAPI_PARTNER_TAG
+      - key: AMAZON_CREATORS_PARTNER_TAG
+        sync: false
+      - key: AMAZON_CREATORS_VERSION
         sync: false

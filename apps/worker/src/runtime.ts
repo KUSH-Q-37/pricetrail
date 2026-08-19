@@ -225,7 +225,7 @@ export async function startWorkerRuntime(
           // One discovery attempt per listing, ever — the id carries no date.
           // The opposite marketplace's catalogue does not change often enough
           // to justify re-searching daily, and each attempt costs a
-          // rate-limited PA-API call.
+          // rate-limited Creators API call.
           await producer.enqueue(
             QUEUE.discover,
             { listingId: job.data.listingId, correlationId: job.data.correlationId },

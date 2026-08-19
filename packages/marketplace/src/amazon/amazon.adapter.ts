@@ -71,7 +71,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
   /**
    * Search Amazon for candidate products, for counterpart discovery.
    *
-   * PA-API only. There is deliberately no scraping fallback here: Amazon
+   * Creators API only. There is deliberately no scraping fallback here: Amazon
    * blocks automated access to its search pages far more aggressively than to
    * product pages, and a blocked search would return a captcha page that
    * parses as zero results — indistinguishable from a genuine empty result,
