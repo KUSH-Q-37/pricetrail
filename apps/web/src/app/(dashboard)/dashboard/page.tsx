@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { CalendarRange, LineChart, Package, Server, Zap } from 'lucide-react';
+import { CalendarRange, LineChart, Package, Zap } from 'lucide-react';
 
 import { DashboardSearch } from '@/components/products/dashboard-search';
 import { Alert } from '@/components/ui/alert';
@@ -13,46 +13,6 @@ const fadeUp = {
   initial: { opacity: 0, y: 8 },
   animate: { opacity: 1, y: 0 },
 };
-
-/**
- * A headline figure about the data itself.
- *
- * This row used to be Prices recorded, API, Database and Redis — one product
- * metric and three pieces of infrastructure, all at identical weight. That is
- * a monitoring console, not a price tracker. Service health still matters and
- * is still shown, but at the bottom of the page rather than in the row a
- * person reads first.
- */
-function Metric({
-  label,
-  value,
-  hint,
-  Icon,
-  loading,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  Icon: typeof Server;
-  loading?: boolean;
-}) {
-  return (
-    <div className="lift rounded-xl border border-border bg-card p-5">
-      <div className="flex items-center gap-2">
-        <Icon className="size-4 text-muted-foreground" aria-hidden="true" />
-        <span className="text-sm text-muted-foreground">{label}</span>
-      </div>
-
-      {loading ? (
-        <Skeleton className="mt-3 h-9 w-28" />
-      ) : (
-        <p className="mt-3 text-3xl font-semibold tabular-price tracking-tight">{value}</p>
-      )}
-
-      {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
-    </div>
-  );
-}
 
 /**
  * One dependency's state, deliberately understated.
@@ -140,42 +100,12 @@ export default function DashboardPage() {
             </motion.div>
           ) : null}
 
-          {/* --- what the data says ---------------------------------------- */}
-          <motion.div variants={fadeUp} className="grid gap-4 sm:grid-cols-3">
-            <Metric
-              label="Prices recorded"
-              value={stats.data ? stats.data.observations.toLocaleString('en-IN') : '—'}
-              hint={
-                stats.data
-                  ? `across ${stats.data.daysTracking.toLocaleString('en-IN')} day${
-                      stats.data.daysTracking === 1 ? '' : 's'
-                    }`
-                  : undefined
-              }
-              Icon={LineChart}
-              loading={stats.isPending}
-            />
-            <Metric
-              label="Products followed"
-              value={stats.data ? stats.data.products.toLocaleString('en-IN') : '—'}
-              hint="checked daily, kept permanently"
-              Icon={Package}
-              loading={stats.isPending}
-            />
-            <Metric
-              label="Marketplaces"
-              value="2"
-              hint="Amazon.in and Flipkart"
-              Icon={Server}
-            />
-          </motion.div>
-
           {/* --- what happens next ----------------------------------------- */}
           {/*
-            This band replaces a large blank area under the metrics. It is not
-            filler: on a fresh install it is the only thing answering "what
-            now", and once data exists it still explains what the daily job is
-            doing between visits — which is otherwise invisible.
+            The only content below the search box, now that the metric row is
+            gone. It earns that: on a fresh install it is the only thing
+            answering "what now", and afterwards it explains what the daily job
+            does between visits, which is otherwise entirely invisible.
           */}
           <motion.div variants={fadeUp}>
             <div className="rounded-xl border border-border bg-card p-6">
