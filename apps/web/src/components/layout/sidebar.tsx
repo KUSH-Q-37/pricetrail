@@ -22,7 +22,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-col gap-1 p-3" aria-label="Main">
+    <nav className="flex flex-col gap-0.5 px-3 py-4" aria-label="Main">
       {navigation.map(({ href, label, Icon }) => {
         const active = pathname === href || pathname.startsWith(`${href}/`);
 
@@ -33,10 +33,10 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
             onClick={onNavigate}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              'relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+              'relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors duration-200',
               active
-                ? 'text-foreground'
-                : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+                ? 'font-medium text-foreground'
+                : 'font-normal text-muted-foreground hover:bg-accent/40 hover:text-foreground',
             )}
           >
             {active ? (
@@ -45,7 +45,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
               <motion.span
                 layoutId="sidebar-active"
                 className="absolute inset-0 rounded-lg bg-accent"
-                transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                transition={{ type: 'spring', stiffness: 420, damping: 36 }}
               />
             ) : null}
             <Icon className="relative size-4 shrink-0" aria-hidden="true" />
@@ -59,8 +59,10 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 
 function Brand() {
   return (
-    <div className="flex h-14 items-center gap-2 border-b border-border px-5">
-      <TrendingUp className="size-5 text-primary" aria-hidden="true" />
+    <div className="flex h-16 items-center gap-2 border-b border-border px-5">
+      <span className="grid size-7 place-items-center rounded-lg bg-primary/10">
+        <TrendingUp className="size-4 text-primary" aria-hidden="true" />
+      </span>
       <span className="font-semibold tracking-tight">PriceTrail</span>
     </div>
   );
@@ -87,7 +89,7 @@ export function Sidebar() {
   return (
     <>
       {/* Desktop: always present, part of the grid rather than an overlay. */}
-      <aside className="hidden w-60 shrink-0 border-r border-border bg-card lg:block">
+      <aside className="hidden w-64 shrink-0 border-r border-border bg-card lg:block">
         <Brand />
         <NavLinks />
       </aside>

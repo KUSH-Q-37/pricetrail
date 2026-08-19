@@ -92,56 +92,47 @@ test.describe('price history chart', () => {
 });
 
 test.describe('product search', () => {
-  // The header search box does the same thing from anywhere in the app; this
-  // block exercises the dialog because it carries the error surface.
   /**
-   * Every locator here is scoped to the dialog.
+   * The dashboard's search panel replaced a modal dialog.
    *
-   * A bare getByLabel('Product URL') is ambiguous: the header search box
-   * carries a similar accessible name and substring-matches. Scoping to the
-   * dialog states the intent and is immune to another field being added
-   * elsewhere with a similar name.
+   * These used to open a dialog and scope every locator to it. With the search
+   * inline on the page, the ambiguity that scoping solved is gone — the header
+   * search is hidden on /dashboard precisely so there is only ever one search
+   * field on this screen.
    */
   test('rejects a URL from an unsupported marketplace with a usable message', async ({
     page,
   }) => {
     await page.goto('/dashboard');
-    await page.getByRole('button', { name: /search a product/i }).first().click();
 
-    const dialog = page.getByRole('dialog');
-    await dialog.getByRole('textbox', { name: 'Product URL' }).fill(
-      'https://www.myntra.com/product/12345',
-    );
-    await dialog.getByRole('button', { name: /^search$/i }).click();
+    await page
+      .getByRole('textbox', { name: /product URL/i })
+      .fill('https://www.myntra.com/product/12345');
+    await page.getByRole('button', { name: /^search$/i }).click();
 
-    await expect(dialog.getByRole('alert')).toContainText(
-      /amazon\.in and flipkart\.com/i,
-    );
-    // The dialog stays open with the URL intact so a typo can be corrected
-    // rather than retyped.
-    await expect(dialog.getByRole('textbox', { name: 'Product URL' })).toHaveValue(
-      /myntra/,
-    );
+    // Matched by TEXT, not by role. Next renders a permanently-present, empty
+    // route announcer with role="alert", so getByRole('alert') resolves to two
+    // elements here and fails strict mode — and reads as the error being
+    // absent when it is not.
+    await expect(page.getByText(/amazon\.in and flipkart\.com/i)).toBeVisible();
+
+    // The URL survives, so a typo can be corrected rather than retyped.
+    await expect(page.getByRole('textbox', { name: /product URL/i })).toHaveValue(/myntra/);
   });
 
-  test('accepts a valid Amazon URL and creates a pending product', async ({ page }) => {
+  test('accepts a valid Amazon URL and navigates to its history', async ({ page }) => {
     const asin = `B0E2E${Date.now().toString().slice(-5)}`;
 
     await page.goto('/dashboard');
-    await page.getByRole('button', { name: /search a product/i }).first().click();
-
-    const dialog = page.getByRole('dialog');
-    await dialog
-      .getByRole('textbox', { name: 'Product URL' })
+    await page
+      .getByRole('textbox', { name: /product URL/i })
       .fill(`https://www.amazon.in/dp/${asin}`);
-    await dialog.getByRole('button', { name: /^search$/i }).click();
+    await page.getByRole('button', { name: /^search$/i }).click();
 
     // Searching navigates to the product's own page rather than closing onto a
-    // list — there is no list. The product arrives PENDING with an honest
-    // "Fetching details" state, because the API never scrapes in the request
-    // path.
-    await expect(dialog).toBeHidden({ timeout: 15_000 });
-    await expect(page).toHaveURL(/\/products\/[0-9a-f-]{36}/, { timeout: 15_000 });
+    // list — there is no list. It arrives PENDING, because the API never
+    // scrapes inside the request path.
+    await expect(page).toHaveURL(/\/products\/[0-9a-f-]{36}/, { timeout: 20_000 });
     await expect(page.getByText(asin, { exact: false }).first()).toBeVisible({
       timeout: 15_000,
     });

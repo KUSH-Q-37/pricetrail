@@ -143,8 +143,10 @@ export function PriceHistoryChart({
           height: 22,
           bottom: 8,
           borderColor: 'transparent',
-          backgroundColor: tokens.isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-          fillerColor: tokens.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+          // Fixed for the one surface this ships on. These were a light/dark
+          // ternary; with a single theme the branch could never be taken.
+          backgroundColor: 'rgba(0,0,0,0.025)',
+          fillerColor: 'rgba(0,0,0,0.045)',
           handleStyle: { color: tokens.muted, borderColor: tokens.border },
           moveHandleStyle: { color: tokens.muted },
           textStyle: { color: tokens.muted, fontSize: 10 },

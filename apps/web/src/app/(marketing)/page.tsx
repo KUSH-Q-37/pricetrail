@@ -1,252 +1,189 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import {
-  BellRing,
-  CalendarClock,
-  LineChart,
-  Link2,
-  ScanSearch,
-  ShieldCheck,
-} from 'lucide-react';
+import { ArrowRight, CalendarClock, LineChart, Link2, ShieldCheck } from 'lucide-react';
 
+import { HeroPriceCard } from '@/components/marketing/hero-price-card';
 import { LiveStats } from '@/components/marketing/live-stats';
 import { Reveal } from '@/components/marketing/reveal';
-import { SamplePriceChart } from '@/components/marketing/sample-price-chart';
 
 export const metadata: Metadata = {
   title: 'PriceTrail — Amazon & Flipkart price history for Indian shoppers',
   description:
-    'Track daily prices across Amazon.in and Flipkart. See 18 months of price history, compare both marketplaces side by side, and tell a real discount from a reset sticker price.',
+    'Track daily prices across Amazon.in and Flipkart. See up to 15 months of real price history and tell a genuine discount from a reset sticker price.',
 };
 
+/**
+ * Three steps, numbered rather than iconed.
+ *
+ * The numbers carry the sequence, which is the only thing this section has to
+ * say. Icons here would be decoration standing in for meaning — there is no
+ * icon that distinguishes "we record it daily" from "we find it on the other
+ * marketplace".
+ */
 const STEPS = [
   {
-    icon: Link2,
-    title: 'Paste a product link',
-    body: 'Drop in any amazon.in or flipkart.com product URL. We read the product identity — brand, model, storage, capacity — not just the title.',
+    n: '01',
+    title: 'Paste a product URL',
+    body: 'Any amazon.in or flipkart.com link. We read the product identity — brand, model, storage, capacity — not just the title.',
   },
   {
-    icon: ScanSearch,
-    title: 'We find it on the other marketplace',
-    body: 'A matching engine compares barcodes, model numbers and specifications. A 128 GB phone is never matched to its 256 GB sibling, and a phone is never matched to its own case.',
+    n: '02',
+    title: 'PriceTrail records it daily',
+    body: 'One observation per product per day, kept permanently. Searching is the whole setup; there is nothing else to switch on.',
   },
   {
-    icon: CalendarClock,
-    title: 'We record the price every day',
-    body: 'One observation per product per day, stored permanently. Over weeks and months that becomes the history a single price tag can never show you.',
+    n: '03',
+    title: 'See the real trend',
+    body: 'Watch what a product actually cost over time, and judge today’s discount against the price it was really selling at.',
   },
 ];
 
-const FEATURES = [
+const VALUES = [
+  {
+    icon: CalendarClock,
+    title: 'Daily price tracking',
+    body: 'Know what a product actually cost over time, not just what the tag says today.',
+  },
   {
     icon: LineChart,
-    title: 'Up to 18 months of history',
-    body: 'Seven days, one month, three, six, a year, or eighteen months — on one chart, with zoom and pan.',
+    title: 'Up to 15 months of history',
+    body: 'Seven days to fifteen months on one chart, with zoom and pan.',
   },
   {
     icon: ShieldCheck,
     title: 'Gaps stay gaps',
-    body: 'If we could not read a price on a given day, the line breaks. We never interpolate a number we did not observe.',
+    body: 'If a price could not be read on a given day, the line breaks. We never invent a number we did not observe.',
   },
-  {
-    icon: BellRing,
-    title: 'Both marketplaces, one axis',
-    body: 'Amazon and Flipkart plotted on the same scale, so the comparison is honest rather than a trick of two different axes.',
-  },
-];
-
-const CATEGORIES = [
-  'Smartphones',
-  'Laptops',
-  'Tablets',
-  'Headphones & audio',
-  'Televisions',
-  'Refrigerators',
-  'Washing machines',
-  'Air conditioners',
 ];
 
 export default function LandingPage() {
   return (
     <>
-      {/* ---------------------------------------------------------------- */}
-      {/* Full viewport height minus the sticky header, so the hero owns the
-          first screen. dvh not vh: on mobile, vh ignores the browser chrome
-          and pushes the CTAs below the fold. */}
-      <section className="relative flex min-h-[calc(100dvh-3.5rem)] w-full items-center overflow-hidden px-4 py-16">
-        {/* Decorative only. Sits behind content, ignores pointer events, and
-            stops entirely under prefers-reduced-motion. */}
-        <div
-          className="aurora -left-24 -top-16 size-[420px] bg-[var(--chart-flipkart)]"
-          aria-hidden="true"
-        />
-        <div
-          className="aurora -right-16 top-24 size-[360px] bg-[var(--chart-amazon)]"
-          style={{ animationDelay: '-9s', animationDuration: '32s' }}
-          aria-hidden="true"
-        />
+      {/* ================================================================= */}
+      {/* HERO                                                              */}
+      {/* ================================================================= */}
+      {/*
+        No longer full-viewport-height. Forcing the hero to own the entire
+        first screen pushed everything else below the fold and left a wide
+        empty band under the copy, so the page read as unfinished rather than
+        spacious. Generous padding gives the same calm without the vacuum, and
+        letting the next section peek in at the bottom is what invites a
+        scroll.
+      */}
+      <section className="relative overflow-hidden px-4 pb-20 pt-16 sm:pt-24">
+        <div className="ambient" aria-hidden="true" />
+        <div className="grid-texture" aria-hidden="true" />
 
-        <div className="relative mx-auto w-full max-w-7xl">
-        <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs text-muted-foreground">
-          <span className="live-dot size-1.5 rounded-full bg-success" aria-hidden="true" />
-          Tracking Amazon.in and Flipkart daily
-        </p>
+        <div className="relative mx-auto grid w-full max-w-7xl items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,520px)] lg:gap-16">
+          {/* --- the argument -------------------------------------------- */}
+          <div>
+            <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-border bg-card/70 px-3 py-1 text-xs text-muted-foreground backdrop-blur-sm">
+              <span className="live-dot size-1.5 rounded-full bg-success" aria-hidden="true" />
+              Tracking Amazon.in &amp; Flipkart daily
+            </p>
 
-        <h1 className="max-w-4xl text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
-          Is that discount real?
-        </h1>
+            <h1 className="text-[2.75rem] font-semibold leading-[1.03] tracking-[-0.03em] sm:text-6xl">
+              Is that discount
+              <br />
+              <span className="text-primary">real?</span>
+            </h1>
 
-        <p className="mt-5 max-w-2xl text-lg text-muted-foreground">
-          A product showing &ldquo;40% off&rdquo; means nothing on its own — the
-          sticker price may have been raised last week. PriceTrail records what
-          things <em>actually</em> cost, every day, and charts it so you can see
-          the difference between a genuine drop and a marketing number.
-        </p>
+            {/* Capped near 62 characters per line. Longer measures are where a
+                reader loses their place returning to the next line. */}
+            <p className="mt-6 max-w-[34rem] text-lg leading-relaxed text-muted-foreground">
+              A product showing &ldquo;40% off&rdquo; means nothing on its own — the
+              sticker price may have been raised last week. PriceTrail records what
+              things <em className="not-italic text-foreground">actually</em> cost,
+              every day, so you can tell a genuine drop from a marketing number.
+            </p>
 
-        {/* One action, deliberately. A second button offering to browse what
-            other people had searched competed with the thing this page is for
-            — and browsing a catalogue is not the product. Searching is.
-            /products still exists and is reachable from the sidebar. */}
-        <div className="mt-8">
-          <Link
-            href="/dashboard"
-            className="inline-flex h-11 items-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Search a product
-          </Link>
-        </div>
-        </div>
-      </section>
-
-      {/* ---------------------------------------------------------------- */}
-      <section className="mx-auto w-full max-w-7xl px-4 pb-16">
-        <Reveal>
-        <div className="lift rounded-xl border border-border bg-card p-5 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-            <div>
-              <h2 className="font-semibold">Apple iPhone 15 Pro (256 GB)</h2>
-              <p className="text-xs text-muted-foreground">
-                Illustrative example — six months of daily observations
-              </p>
-            </div>
-            <div className="flex items-center gap-4 text-xs">
-              <span className="inline-flex items-center gap-1.5">
-                <span
-                  className="size-2 rounded-sm"
-                  style={{ background: 'var(--chart-amazon)' }}
+            <div className="mt-9 flex flex-wrap items-center gap-4">
+              <Link
+                href="/dashboard"
+                className="group inline-flex h-12 items-center gap-2 rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow-[var(--shadow-sm)] transition-all duration-200 hover:bg-primary/90 hover:shadow-[var(--shadow-md)]"
+              >
+                Search a product
+                <ArrowRight
+                  className="size-4 transition-transform duration-200 group-hover:translate-x-0.5"
                   aria-hidden="true"
                 />
-                Amazon
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span
-                  className="size-2 rounded-sm"
-                  style={{ background: 'var(--chart-flipkart)' }}
-                  aria-hidden="true"
-                />
-                Flipkart
+              </Link>
+
+              <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                <Link2 className="size-3.5" aria-hidden="true" />
+                No account needed
               </span>
             </div>
           </div>
 
-          <SamplePriceChart />
-
-          <p className="mt-4 text-xs text-muted-foreground">
-            The break in the orange line is a day we could not record a price.
-            We show it as a gap rather than drawing a straight line through it.
-          </p>
+          {/* --- the same argument, as a picture -------------------------- */}
+          <div className="relative">
+            <HeroPriceCard />
+          </div>
         </div>
-        </Reveal>
       </section>
 
-      <LiveStats />
-
-      {/* ---------------------------------------------------------------- */}
-      <section className="border-t border-border bg-muted/20">
+      {/* ================================================================= */}
+      {/* HOW IT WORKS                                                      */}
+      {/* ================================================================= */}
+      <section className="border-t border-border bg-card/40">
         <div className="mx-auto w-full max-w-7xl px-4 py-16">
-          <h2 className="text-2xl font-semibold tracking-tight">How it works</h2>
-          <div className="mt-8 grid gap-6 sm:grid-cols-3">
-            {STEPS.map(({ icon: Icon, title, body }, index) => (
-              <Reveal key={title} delay={index * 0.1}>
-                <div className="mb-3 flex items-center gap-2">
-                  <span className="grid size-8 place-items-center rounded-lg bg-primary/10">
-                    <Icon className="size-4 text-primary" aria-hidden="true" />
-                  </span>
-                  <span className="text-xs font-medium text-muted-foreground">
-                    Step {index + 1}
-                  </span>
-                </div>
-                <h3 className="font-medium">{title}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                  {body}
-                </p>
+          <h2 className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            How PriceTrail works
+          </h2>
+
+          {/* One-pixel gaps filled by the container's background. Three
+              bordered cards side by side double the line at every join; this
+              produces a single crisp rule instead. */}
+          <div className="mt-8 grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3">
+            {STEPS.map(({ n, title, body }, index) => (
+              <Reveal key={n} delay={index * 0.08} className="bg-card p-6">
+                <span className="text-xs font-medium tabular-price text-primary">{n}</span>
+                <h3 className="mt-3 font-medium">{title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{body}</p>
               </Reveal>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ---------------------------------------------------------------- */}
+      {/* ================================================================= */}
+      {/* VALUE                                                             */}
+      {/* ================================================================= */}
       <section className="mx-auto w-full max-w-7xl px-4 py-16">
-        <h2 className="text-2xl font-semibold tracking-tight">
-          Built to be trustworthy
-        </h2>
-        <p className="mt-2 max-w-2xl text-muted-foreground">
-          A price tracker is only worth using if you can believe the chart.
-        </p>
-
-        <div className="mt-8 grid gap-6 sm:grid-cols-3">
-          {FEATURES.map(({ icon: Icon, title, body }, index) => (
-            <Reveal key={title} delay={index * 0.1} className="lift rounded-xl border border-border p-5">
-              <Icon className="mb-3 size-5 text-primary" aria-hidden="true" />
-              <h3 className="font-medium">{title}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                {body}
-              </p>
+        <div className="grid gap-8 sm:grid-cols-3">
+          {VALUES.map(({ icon: Icon, title, body }, index) => (
+            <Reveal key={title} delay={index * 0.08}>
+              <Icon className="size-5 text-primary" aria-hidden="true" />
+              <h3 className="mt-3 font-medium">{title}</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{body}</p>
             </Reveal>
           ))}
         </div>
       </section>
 
-      {/* ---------------------------------------------------------------- */}
+      <LiveStats />
+
+      {/* ================================================================= */}
+      {/* CLOSE                                                             */}
+      {/* ================================================================= */}
       <section className="border-t border-border">
-        <div className="mx-auto w-full max-w-7xl px-4 py-16">
-          <h2 className="text-2xl font-semibold tracking-tight">
-            What we track
-          </h2>
-          <p className="mt-2 max-w-2xl text-muted-foreground">
-            Electronics and home appliances — categories where prices move
-            often, variants matter, and a wrong match would be misleading.
-          </p>
-
-          <ul className="mt-6 flex flex-wrap gap-2">
-            {CATEGORIES.map((category) => (
-              <li
-                key={category}
-                className="lift rounded-full border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground"
-              >
-                {category}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      {/* ---------------------------------------------------------------- */}
-      <section className="border-t border-border bg-muted/20">
         <div className="mx-auto w-full max-w-7xl px-4 py-16 text-center">
           <h2 className="text-2xl font-semibold tracking-tight">
             Know the price before you pay it
           </h2>
-          <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-            Paste a product link and we start recording its price today. No
-            account, no sign-up — search is all there is.
+          <p className="mx-auto mt-3 max-w-md text-muted-foreground">
+            Paste a product link and we start recording its price today.
           </p>
           <Link
             href="/dashboard"
-            className="mt-7 inline-flex h-11 items-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="group mt-8 inline-flex h-12 items-center gap-2 rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow-[var(--shadow-sm)] transition-all duration-200 hover:bg-primary/90 hover:shadow-[var(--shadow-md)]"
           >
             Search a product
+            <ArrowRight
+              className="size-4 transition-transform duration-200 group-hover:translate-x-0.5"
+              aria-hidden="true"
+            />
           </Link>
         </div>
       </section>

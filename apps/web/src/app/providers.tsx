@@ -2,7 +2,6 @@
 
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { ThemeProvider } from 'next-themes';
 import { useState, type ReactNode } from 'react';
 
 import { getQueryClient } from '@/lib/query-client';
@@ -20,16 +19,7 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider
-        attribute="class"
-        defaultTheme="system"
-        enableSystem
-        // Without this, every colour transition animates during the theme
-        // swap and the whole page visibly smears for ~200ms.
-        disableTransitionOnChange
-      >
-        {children}
-      </ThemeProvider>
+      {children}
 
       {process.env.NODE_ENV === 'development' ? (
         <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />

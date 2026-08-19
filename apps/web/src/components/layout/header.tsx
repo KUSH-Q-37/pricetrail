@@ -1,10 +1,9 @@
 'use client';
 
 import { Loader2, Menu, Search } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 
-import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { ApiStatusPill } from '@/components/layout/api-status-pill';
 import { ApiError } from '@/lib/api-client';
 import { useIngestProduct } from '@/hooks/use-products';
@@ -25,6 +24,12 @@ import { useUiStore } from '@/stores/ui-store';
 export function Header() {
   const toggleSidebar = useUiStore((state) => state.toggleSidebar);
   const router = useRouter();
+  const pathname = usePathname();
+
+  // Hidden on the dashboard, which has its own full-width search panel. Two
+  // search boxes on one screen leave a person working out which is the real
+  // one, and the answer is neither.
+  const showSearch = pathname !== '/dashboard';
   const ingest = useIngestProduct();
   const [url, setUrl] = useState('');
 
@@ -56,6 +61,7 @@ export function Header() {
         <Menu className="size-5" aria-hidden="true" />
       </button>
 
+      {showSearch ? (
       <form onSubmit={onSubmit} className="relative min-w-0 max-w-md flex-1">
         {ingest.isPending ? (
           <Loader2
@@ -72,7 +78,12 @@ export function Header() {
         <input
           type="search"
           value={url}
-          onChange={(event) => setUrl(event.target.value)}
+          onChange={(event) => {
+            setUrl(event.target.value);
+            // See the dashboard search: a stale error under a corrected URL
+            // reads as the app being broken.
+            if (ingest.error) ingest.reset();
+          }}
           disabled={ingest.isPending}
           placeholder="Paste an Amazon or Flipkart product URL…"
           aria-label="Paste an Amazon or Flipkart product URL"
@@ -93,10 +104,10 @@ export function Header() {
           </p>
         ) : null}
       </form>
+      ) : null}
 
       <div className="ml-auto flex items-center gap-2">
         <ApiStatusPill />
-        <ThemeToggle />
       </div>
     </header>
   );

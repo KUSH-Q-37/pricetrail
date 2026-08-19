@@ -13,19 +13,20 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#0b0d12' },
-  ],
+  // One colour, matching the page background. This used to declare a
+  // prefers-color-scheme pair, which would now tint mobile browser chrome dark
+  // around a page that is always light — the seam is very visible on iOS.
+  themeColor: '#f7f5f2',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // suppressHydrationWarning is required exactly here: next-themes writes the
-    // resolved theme class onto <html> in a blocking inline script before React
-    // hydrates, so the server markup and the client DOM legitimately differ on
-    // this one element. Scoped to <html>, it hides nothing else.
-    <html lang="en" suppressHydrationWarning>
+    // No suppressHydrationWarning any more. It existed because next-themes
+    // wrote a theme class onto <html> before React hydrated, so server and
+    // client legitimately disagreed on this one element. With a single theme
+    // nothing writes to <html>, and leaving the suppression in place would
+    // silently hide a real hydration mismatch if one ever appeared here.
+    <html lang="en">
       <body className="min-h-dvh antialiased">
         <Providers>{children}</Providers>
       </body>

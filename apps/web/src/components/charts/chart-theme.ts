@@ -17,7 +17,6 @@ export interface ChartTokens {
   muted: string;
   grid: string;
   border: string;
-  isDark: boolean;
 }
 
 const FALLBACK: ChartTokens = {
@@ -28,7 +27,6 @@ const FALLBACK: ChartTokens = {
   muted: '#6b7280',
   grid: '#e6e7ea',
   border: '#e6e7ea',
-  isDark: false,
 };
 
 function read(style: CSSStyleDeclaration, name: string, fallback: string): string {
@@ -37,12 +35,17 @@ function read(style: CSSStyleDeclaration, name: string, fallback: string): strin
 }
 
 /**
- * Track the active theme.
+ * Read the chart tokens from CSS custom properties.
  *
- * A MutationObserver on <html>'s class list is required rather than reading
- * once: next-themes toggles the class after mount, and a chart that sampled
- * its colours during the first render would keep light-mode axes on a dark
- * surface until something else forced a re-render.
+ * Sampled once on mount rather than watched. There used to be a
+ * MutationObserver on <html>'s class list, because next-themes toggled a class
+ * after hydration and a chart that read its colours during the first render
+ * would have kept light axes on a dark surface. With a single theme the class
+ * never changes, so the observer watched for an event that cannot happen.
+ *
+ * Still read from CSS rather than hardcoded here: the palette lives in
+ * globals.css, and duplicating it would let the chart drift away from the rest
+ * of the interface one careless edit at a time.
  */
 export function useChartTokens(): ChartTokens {
   const [tokens, setTokens] = useState<ChartTokens>(FALLBACK);
@@ -50,31 +53,21 @@ export function useChartTokens(): ChartTokens {
   useEffect(() => {
     const sample = (): void => {
       const style = getComputedStyle(document.documentElement);
-      const isDark = document.documentElement.classList.contains('dark');
 
       setTokens({
         amazon: read(style, '--chart-amazon', FALLBACK.amazon),
         flipkart: read(style, '--chart-flipkart', FALLBACK.flipkart),
         // The chart sits on a card, so the card colour is the plot surface —
         // that is what the palette was validated against.
-        surface: read(style, '--card', isDark ? '#14161b' : '#ffffff'),
-        text: read(style, '--card-foreground', isDark ? '#f1f2f4' : '#22252b'),
+        surface: read(style, '--card', '#ffffff'),
+        text: read(style, '--card-foreground', '#22252b'),
         muted: read(style, '--muted-foreground', FALLBACK.muted),
         grid: read(style, '--border', FALLBACK.grid),
         border: read(style, '--border', FALLBACK.border),
-        isDark,
       });
     };
 
     sample();
-
-    const observer = new MutationObserver(sample);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class'],
-    });
-
-    return () => observer.disconnect();
   }, []);
 
   return tokens;

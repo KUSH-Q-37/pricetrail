@@ -1,143 +1,126 @@
 @import "tailwindcss";
 
-/*
- * Tailwind v4 defaults `dark:` to prefers-color-scheme, which cannot be
- * overridden by a user toggle. Redefining the variant to key off a `.dark`
- * class is what lets next-themes drive the theme explicitly (system / light /
- * dark) instead of the OS having the only vote.
- */
-@custom-variant dark (&:where(.dark, .dark *));
+/* ===========================================================================
+   PriceTrail — one theme.
+   ===========================================================================
 
-/*
- * Semantic tokens, not raw colours.
- *
- * Components reference `bg-card` / `text-muted-foreground`, never `bg-white`
- * or `bg-zinc-900`. That indirection is the whole reason a theme switch is one
- * class on <html> rather than a per-component audit.
- *
- * oklch is used throughout: it is perceptually uniform, so a fixed lightness
- * step looks like the same step across hues. Interpolating in hex/hsl produces
- * muddy mid-tones in gradients and hover states.
- */
+   There is no dark mode, no toggle, and no `prefers-color-scheme` branch. That
+   is a product decision rather than an omission: two themes mean every
+   surface, border, shadow and chart step has to be designed and validated
+   twice, and the second one is invariably the one nobody checks. One surface,
+   chosen and validated, is the more finished answer.
+
+   Tokens are semantic, never raw colour. Components say `bg-card` and
+   `text-muted-foreground`, never `bg-white` or `bg-zinc-900`, so the palette
+   can be re-tuned in this file alone.
+
+   oklch throughout: it is perceptually uniform, so a fixed lightness step
+   looks like the same step across hues, and mid-tones in gradients and hover
+   states stay clean rather than going muddy the way hex/hsl interpolation
+   does.
+--------------------------------------------------------------------------- */
+
 :root {
-  --radius: 0.625rem;
+  /* 14px. Large enough to read as considered, small enough that cards do not
+     turn into pills. Everything else steps off this. */
+  --radius: 0.875rem;
 
-  --background: oklch(0.995 0 0);
-  --foreground: oklch(0.18 0.01 265);
+  /* --- surfaces ----------------------------------------------------------
+     The page is a warm off-white and cards are pure white, so a card lifts off
+     the page without needing a shadow to do it. A pure-white page would force
+     every surface to be separated by a border instead. */
+  /* Deepened from 0.985 after looking at a render: at that value a white card
+     on this page was indistinguishable from the page, so every surface needed
+     its border to exist at all. This is still unmistakably light, but a card
+     now separates on its own. */
+  --background: oklch(0.968 0.007 85);
+  --foreground: oklch(0.17 0.012 265);
 
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.01 265);
+  --card-foreground: oklch(0.17 0.012 265);
 
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.01 265);
+  --popover-foreground: oklch(0.17 0.012 265);
 
-  --primary: oklch(0.52 0.21 265);
+  /* --- interaction -------------------------------------------------------
+     One blue, for actions, links and focus. Deliberately not applied to
+     surfaces or headings: when everything is blue, nothing is. */
+  --primary: oklch(0.52 0.22 262);
   --primary-foreground: oklch(0.99 0 0);
 
-  --secondary: oklch(0.96 0.005 265);
-  --secondary-foreground: oklch(0.25 0.02 265);
+  --secondary: oklch(0.965 0.004 265);
+  --secondary-foreground: oklch(0.28 0.02 265);
 
-  --muted: oklch(0.965 0.004 265);
-  --muted-foreground: oklch(0.53 0.02 265);
+  --muted: oklch(0.968 0.004 265);
+  --muted-foreground: oklch(0.52 0.02 265);
 
-  --accent: oklch(0.95 0.02 265);
-  --accent-foreground: oklch(0.25 0.03 265);
+  --accent: oklch(0.955 0.012 262);
+  --accent-foreground: oklch(0.3 0.04 262);
 
-  --destructive: oklch(0.58 0.22 27);
+  /* --- status ------------------------------------------------------------ */
+  --destructive: oklch(0.55 0.2 25);
   --destructive-foreground: oklch(0.99 0 0);
 
-  --success: oklch(0.62 0.16 150);
+  --success: oklch(0.55 0.14 155);
   --success-foreground: oklch(0.99 0 0);
 
-  --warning: oklch(0.72 0.16 75);
-  --warning-foreground: oklch(0.2 0.02 75);
+  --warning: oklch(0.7 0.15 70);
+  --warning-foreground: oklch(0.2 0.03 70);
 
-  --border: oklch(0.91 0.005 265);
-  --input: oklch(0.91 0.005 265);
-  --ring: oklch(0.52 0.21 265);
+  /* --- price movement ----------------------------------------------------
+     Separate tokens from success/destructive, even though the hues are close.
+     A price falling is good news for a shopper and a price rising is not, but
+     neither is a SYSTEM state — conflating them would mean a failed request
+     and a price rise share a colour, and re-tuning one would move the other.
 
-  /*
-   * Marketplace identity colours. Fixed per platform and never themed —
-   * a user must be able to tell the Amazon series from the Flipkart series at
-   * a glance, and that association has to survive a theme switch.
-   *
-   * These are the UI chip colours (badges, dots). They always ship beside a
-   * text label, so identity is never carried by colour alone.
-   */
-  --amazon: oklch(0.75 0.16 65);
-  --flipkart: oklch(0.58 0.19 258);
+     Never used alone: every price change ships with an arrow and a signed
+     number, so the meaning survives for a colourblind reader and in print. */
+  --price-down: oklch(0.52 0.14 155);
+  --price-down-surface: oklch(0.96 0.03 155);
+  --price-up: oklch(0.54 0.19 25);
+  --price-up-surface: oklch(0.965 0.025 25);
+  --price-flat: oklch(0.55 0.015 265);
 
-  /*
-   * CHART SERIES colours — a separate, VALIDATED step of the same two hues.
-   *
-   * Chart marks are held to stricter rules than a labelled chip, and the chip
-   * values fail them: #f29520 sits at 2.31:1 against a white plot surface
-   * (below the 3:1 mark-contrast floor). These steps were produced by running
-   * the palette validator, not by eye, and clear all six checks —
-   * CVD separation ΔE 32.8 (protanopia) and 38.8 normal-vision, both far above
-   * the 8 / 15 floors.
-   *
-   * Same hue, different lightness step. A reader still learns "orange =
-   * Amazon"; only the step changes with the surface it sits on.
-   */
+  /* --- lines -------------------------------------------------------------
+     Very low contrast on purpose. A border's job is to group, not to attract
+     attention; anything heavier and a page of cards reads as a grid of boxes. */
+  --border: oklch(0.925 0.005 265);
+  --input: oklch(0.9 0.006 265);
+  --ring: oklch(0.52 0.22 262);
+
+  /* --- elevation ---------------------------------------------------------
+     Three steps, all soft and tinted toward the text colour rather than pure
+     black, which is what stops a shadow reading as a grey smudge. */
+  --shadow-xs: 0 1px 2px -1px oklch(0.17 0.012 265 / 0.06);
+  --shadow-sm: 0 2px 8px -3px oklch(0.17 0.012 265 / 0.1);
+  --shadow-md: 0 10px 30px -14px oklch(0.17 0.012 265 / 0.18);
+
+  /* --- marketplace identity ---------------------------------------------
+     Fixed per platform. A reader must be able to tell the Amazon series from
+     the Flipkart one at a glance, so these never shift with context. They
+     always ship beside a text label — identity is never carried by colour
+     alone. */
+  --amazon: oklch(0.72 0.15 65);
+  --flipkart: oklch(0.55 0.19 258);
+
+  /* --- chart series ------------------------------------------------------
+     A separate, VALIDATED step of the same two hues. Chart marks are held to
+     stricter rules than a labelled chip, and the chip values fail them — the
+     Amazon chip sits at 2.31:1 against a white plot surface, below the 3:1
+     mark-contrast floor.
+
+     These were produced by running the palette validator, not by eye, and
+     clear all six checks against this surface: lightness band, chroma floor,
+     CVD separation ΔE 29.9 (protan) / 27.2 (tritan), normal-vision ΔE 34.5,
+     and contrast. Re-run the validator before changing either value. */
   --chart-amazon: #d1780f;
   --chart-flipkart: #2275e8;
 }
 
-.dark {
-  --background: oklch(0.16 0.008 265);
-  --foreground: oklch(0.96 0.003 265);
-
-  --card: oklch(0.2 0.01 265);
-  --card-foreground: oklch(0.96 0.003 265);
-
-  --popover: oklch(0.2 0.01 265);
-  --popover-foreground: oklch(0.96 0.003 265);
-
-  --primary: oklch(0.68 0.17 265);
-  --primary-foreground: oklch(0.16 0.01 265);
-
-  --secondary: oklch(0.26 0.015 265);
-  --secondary-foreground: oklch(0.96 0.003 265);
-
-  --muted: oklch(0.25 0.012 265);
-  --muted-foreground: oklch(0.68 0.015 265);
-
-  --accent: oklch(0.3 0.03 265);
-  --accent-foreground: oklch(0.96 0.003 265);
-
-  --destructive: oklch(0.65 0.2 27);
-  --destructive-foreground: oklch(0.99 0 0);
-
-  --success: oklch(0.7 0.15 150);
-  --success-foreground: oklch(0.16 0.01 150);
-
-  --warning: oklch(0.78 0.15 75);
-  --warning-foreground: oklch(0.18 0.02 75);
-
-  --border: oklch(0.3 0.012 265);
-  --input: oklch(0.3 0.012 265);
-  --ring: oklch(0.68 0.17 265);
-
-  /* Lifted slightly for contrast against the dark canvas. */
-  --amazon: oklch(0.79 0.16 65);
-  --flipkart: oklch(0.68 0.17 258);
-
-  /*
-   * Dark-mode chart series — SELECTED for this surface, not flipped from light.
-   *
-   * The chip values fail the dark lightness band outright: #ffa236 measures
-   * L 0.789 and #5097ff L 0.68, against a band of 0.48-0.67. Both re-stepped
-   * down, hue held, then re-validated on the #14161b card surface.
-   */
-  --chart-amazon: #cc7d1e;
-  --chart-flipkart: #4285ef;
-}
-
 /*
  * `@theme inline` publishes the variables above as Tailwind utilities, so
- * `bg-card`, `text-muted-foreground`, `border-border` and `stroke-amazon` all
- * exist and all follow the active theme.
+ * `bg-card`, `text-muted-foreground`, `border-border` and `text-price-down`
+ * all exist as real classes.
  */
 @theme inline {
   --color-background: var(--background);
@@ -166,8 +149,14 @@
   --color-amazon: var(--amazon);
   --color-flipkart: var(--flipkart);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --color-price-down: var(--price-down);
+  --color-price-down-surface: var(--price-down-surface);
+  --color-price-up: var(--price-up);
+  --color-price-up-surface: var(--price-up-surface);
+  --color-price-flat: var(--price-flat);
+
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 4px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
@@ -181,9 +170,9 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     /*
-     * System font stack rather than next/font/google. A webfont fetch at build
-     * time makes the build fail without network access, and this stack renders
-     * natively on every target platform with zero layout shift.
+     * System stack rather than next/font/google. A webfont fetch at build time
+     * makes the build fail without network access, and this renders natively
+     * on every target platform with zero layout shift.
      */
     font-family:
       ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
@@ -192,14 +181,24 @@
     text-rendering: optimizeLegibility;
   }
 
-  /* Tabular figures stop prices from jittering as digits change. */
+  /* Headings run tighter than body text; at display sizes the default leading
+     opens gaps that read as unintentional. */
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+  }
+
+  /* Tabular figures stop prices jittering as digits change. */
   .tabular-price {
     font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
   }
 
   :focus-visible {
     outline: 2px solid var(--color-ring);
     outline-offset: 2px;
+    border-radius: calc(var(--radius) - 6px);
   }
 
   /* Honour users who have asked the OS to reduce motion. */
@@ -215,18 +214,19 @@
   }
 }
 
-/* ---------------------------------------------------------------------------
-   Landing page motion.
-   
-   CSS, not a JS animation library, for everything below. These run on the
-   compositor, cost nothing on the main thread, and — crucially — work inside
-   the SVG chart while it stays a server component. Reaching for Framer Motion
-   there would have forced it client-side and pulled the hero visual out of the
-   server-rendered HTML.
+/* ===========================================================================
+   Motion and surface texture
+   ===========================================================================
+
+   CSS rather than a JS animation library. These run on the compositor, cost
+   nothing on the main thread, and — the reason it matters here — work inside
+   an SVG that stays a server component. Framer Motion in that chart would have
+   forced it client-side and pulled the hero visual out of the server-rendered
+   HTML a crawler receives.
 --------------------------------------------------------------------------- */
 
-/* Chart lines draw themselves in. dasharray is set to the path length so the
-   dash is the whole line, then the offset walks it into view. */
+/* Chart lines draw themselves in. dasharray is the path length, so the dash is
+   the whole line and the offset walks it into view. */
 @keyframes draw-line {
   from { stroke-dashoffset: var(--dash); }
   to   { stroke-dashoffset: 0; }
@@ -235,61 +235,87 @@
 .chart-line {
   stroke-dasharray: var(--dash);
   stroke-dashoffset: var(--dash);
-  animation: draw-line 1.6s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+  animation: draw-line 1.4s cubic-bezier(0.33, 1, 0.68, 1) forwards;
 }
 
-/* Slow drifting colour behind the hero. Two blurred radial blobs on long,
-   offset cycles never repeat visibly, which is what keeps it from reading as
-   a loop. */
-@keyframes aurora-drift {
-  0%,  100% { transform: translate(0, 0) scale(1); }
-  33%       { transform: translate(6%, -4%) scale(1.12); }
-  66%       { transform: translate(-5%, 3%) scale(0.95); }
-}
-
-.aurora {
+/*
+ * Ambient wash behind the hero.
+ *
+ * This replaces two saturated blurred blobs, which read as decoration applied
+ * to the page rather than as part of it. What is left is a single very low
+ * chroma lift toward the top of the section — closer to light falling on a
+ * surface than to a graphic. It does not animate: a background that moves
+ * competes with the content it exists to sit behind.
+ */
+.ambient {
   position: absolute;
-  border-radius: 9999px;
-  filter: blur(90px);
-  opacity: 0.22;
-  will-change: transform;
-  animation: aurora-drift 26s ease-in-out infinite;
+  inset: 0;
   pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 50% 0%, oklch(0.52 0.22 262 / 0.05), transparent 70%),
+    radial-gradient(40% 40% at 85% 10%, oklch(0.72 0.15 65 / 0.035), transparent 70%);
 }
 
-.dark .aurora { opacity: 0.3; }
+/*
+ * Faint grid — a nod to plotted data rather than an illustration of it.
+ * Masked so it fades out well before it reaches any text.
+ */
+.grid-texture {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, oklch(0.17 0.012 265 / 0.028) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(0.17 0.012 265 / 0.028) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(70% 60% at 50% 0%, black, transparent 75%);
+}
 
 /* Soft pulse on the "tracking daily" dot — a heartbeat implying live data. */
 @keyframes live-pulse {
-  0%, 100% { opacity: 1;   transform: scale(1); }
+  0%, 100% { opacity: 1;    transform: scale(1); }
   50%      { opacity: 0.45; transform: scale(0.82); }
 }
 
 .live-dot { animation: live-pulse 2.4s ease-in-out infinite; }
 
-/* Cards lift slightly toward the cursor. Small — 2px reads as responsive,
-   8px reads as a toy. */
+/*
+ * Card hover. 2px, because 2px reads as responsive and 8px reads as a toy.
+ * The border warming toward the primary does more work than the movement.
+ */
 .lift {
-  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
-              box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1),
-              border-color 0.25s ease;
-}
-.lift:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 28px -12px rgb(0 0 0 / 0.28);
-  border-color: color-mix(in oklab, var(--primary) 35%, var(--border));
+  transition:
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.2s ease;
 }
 
-/* One switch disables all of it. Required, not a nicety: the OS setting is a
-   medical accommodation, and an infinite background animation is exactly what
-   it exists to stop. */
+.lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: color-mix(in oklab, var(--primary) 22%, var(--border));
+}
+
+/* Entrance for content that arrives after a fetch, so a chart or card resolves
+   rather than snapping in. */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.rise-in {
+  animation: rise-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* One switch disables the lot. Required rather than polite: the OS setting is
+   a medical accommodation. */
 @media (prefers-reduced-motion: reduce) {
   .chart-line {
     animation: none;
     stroke-dashoffset: 0;
   }
-  .aurora,
-  .live-dot {
+  .live-dot,
+  .rise-in {
     animation: none;
   }
   .lift:hover {
