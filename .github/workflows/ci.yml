@@ -231,6 +231,13 @@ jobs:
         run: |
           set +e
 
+          # Kill any existing processes on ports 3000 and 3001 to avoid EADDRINUSE errors
+          lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+          lsof -ti:3001 | xargs kill -9 2>/dev/null || true
+          
+          # Give ports time to fully release
+          sleep 2
+
           node apps/api/dist/main.js > /tmp/api.log 2>&1 &
           API_PID=$!
           pnpm --filter @pricetrail/web start > /tmp/web.log 2>&1 &
