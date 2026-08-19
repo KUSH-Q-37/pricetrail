@@ -231,9 +231,16 @@ jobs:
         run: |
           set +e
 
+          # PORT is set to 3001 at job level for the API — and `next start`
+          # reads PORT as well. Next is ready in ~100ms while the API is still
+          # opening Prisma and Redis, so web won the race, bound 3001, and the
+          # API died with EADDRINUSE. wait-on then sat waiting for a /dashboard
+          # that was never going to appear on 3000.
+          #
+          # Web gets its port explicitly rather than inheriting the API's.
           node apps/api/dist/main.js > /tmp/api.log 2>&1 &
           API_PID=$!
-          pnpm --filter @pricetrail/web start > /tmp/web.log 2>&1 &
+          PORT=3000 pnpm --filter @pricetrail/web start > /tmp/web.log 2>&1 &
           WEB_PID=$!
 
           npx --yes wait-on http://localhost:3001/health/live http://localhost:3000/dashboard -t 120000
