@@ -35,7 +35,9 @@ export const DEFAULT_RETIRE_AFTER_MONTHS = 12;
  *
  * lastSearchedAt is the only signal left. There are no accounts, so there is
  * no favourites list to consult — if nobody has searched a URL in a year, that
- * is the entirety of what the system knows about who wants it.
+ * is the entirety of what the system knows about who wants it. For products
+ * the catalogue crawler enrolled, which nobody ever searched, createdAt stands
+ * in for the same signal.
  *
  * Set TRACKING_RETIRE_AFTER_MONTHS=0 to disable, which is the right setting
  * while the catalogue is small enough that the sweep costs nothing.
@@ -58,12 +60,27 @@ export async function retireStaleTracking(
   const result = await prisma.marketplaceListing.updateMany({
     where: {
       trackingEnabled: true,
-      // NULL means "never searched through the new ingest path" — listings that
-      // predate the column. Those are deliberately NOT retired: absence of a
-      // record is not evidence of disinterest, and silently standing down every
-      // pre-existing listing on first run would be the worst possible outcome
-      // of adding a column. They retire naturally once searched and left alone.
-      lastSearchedAt: { not: null, lt: cutoffDate },
+      OR: [
+        // Searched at some point, and not since the cutoff.
+        { lastSearchedAt: { not: null, lt: cutoffDate } },
+
+        // Never searched by anyone, and old enough that this is now evidence
+        // rather than absence of it.
+        //
+        // NULL used to be blanket-protected, on the reasoning that listings
+        // predating the column should not be stood down for want of a record.
+        // Catalogue discovery gave NULL a second meaning: enrolled by the
+        // crawler, wanted by nobody. Those are the majority now, and if they
+        // can never retire, the tracked set only grows — until it hits the cap,
+        // at which point a product somebody actually searches cannot get in
+        // because the budget is full of items nobody has ever opened.
+        //
+        // createdAt is what makes this safe for the original case too: a
+        // legacy listing is only retired if it has ALSO existed, unsearched,
+        // for the full retirement window. And retiring is still not deleting —
+        // one search sets trackingEnabled back to true with its history intact.
+        { lastSearchedAt: null, createdAt: { lt: cutoffDate } },
+      ],
     },
     data: { trackingEnabled: false },
   });

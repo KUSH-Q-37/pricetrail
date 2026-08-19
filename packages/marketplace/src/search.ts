@@ -63,8 +63,17 @@ export interface MarketplaceSearch {
    *
    * Implementations must not throw for want of configuration — return
    * `{ available: false, retryable: false, candidates: [] }` instead.
+   *
+   * `page` is 1-based and exists for catalogue discovery, which walks a query
+   * far deeper than counterpart matching ever does. Counterpart discovery only
+   * ever wants the first page: relevance falls off a cliff after it, and a
+   * match that is not in the top handful is not a match.
    */
-  searchProducts(query: string, limit?: number): Promise<ProductSearchResult>;
+  searchProducts(
+    query: string,
+    limit?: number,
+    page?: number,
+  ): Promise<ProductSearchResult>;
 }
 
 /** The answer when a marketplace has no usable search source. */

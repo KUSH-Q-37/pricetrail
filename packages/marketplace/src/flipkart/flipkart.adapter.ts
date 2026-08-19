@@ -77,12 +77,22 @@ export class FlipkartAdapter implements MarketplaceAdapter {
    * phone case for a phone query, and deciding equivalence is the matching
    * engine's job — its veto rules exist for exactly this input.
    */
-  async searchProducts(query: string, limit = 5): Promise<ProductSearchResult> {
+  async searchProducts(
+    query: string,
+    limit = 5,
+    page = 1,
+  ): Promise<ProductSearchResult> {
     const trimmed = query.trim();
     if (trimmed.length === 0) return searchUnavailable('empty query', false);
 
     const fetchImpl = this.options.fetchImpl ?? fetch;
-    const url = `https://www.flipkart.com/search?q=${encodeURIComponent(trimmed)}`;
+    // Page 1 is requested without the parameter, exactly as a browser does.
+    // Flipkart serves ?page=1 fine, but keeping the common case byte-identical
+    // to real traffic is free.
+    const url =
+      page > 1
+        ? `https://www.flipkart.com/search?q=${encodeURIComponent(trimmed)}&page=${page}`
+        : `https://www.flipkart.com/search?q=${encodeURIComponent(trimmed)}`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15_000);

@@ -49,7 +49,16 @@ services:
     #
     # `exec prisma` rather than the migrate:deploy script — that script wraps
     # prisma in `dotenv -e ../../.env`, and there is no .env file on Render.
-    startCommand: pnpm --filter @pricetrail/database exec prisma migrate deploy && node apps/api/dist/main.js
+    # NOTE: pricetrail-api was created by hand in the Render dashboard, not
+    # from this Blueprint, so Render runs the Start Command configured there
+    # and ignores this line. That is why migrations never ran: this file said
+    # one thing and the service did another for weeks. Keep the two in step.
+    #
+    # Direct binary path rather than `pnpm exec`: pnpm is installed globally in
+    # buildCommand, and depending on it again at start is one more thing that
+    # can be absent when the service boots. prisma is a devDependency of
+    # packages/database and pnpm does not hoist it to the root .bin.
+    startCommand: packages/database/node_modules/.bin/prisma migrate deploy --schema packages/database/prisma/schema.prisma && node apps/api/dist/main.js
 
     healthCheckPath: /health/live
 

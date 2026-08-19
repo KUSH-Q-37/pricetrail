@@ -1,4 +1,5 @@
 import type { FetchedProduct } from './product-data.schema';
+import type { MarketplaceSearch } from './search';
 
 /**
  * Why a fetch failed. The distinction drives retry policy, so a wrong
@@ -103,7 +104,13 @@ export interface FetchStrategy {
  * tomorrow, the scraping strategy is already the full implementation and gets
  * promoted; nothing above this line changes.
  */
-export interface MarketplaceAdapter {
+/**
+ * Extends MarketplaceSearch because both adapters have implemented
+ * searchProducts since counterpart discovery was added — the interface simply
+ * never said so, which meant anything holding a MarketplaceAdapter had to
+ * cast to reach a method that was always there.
+ */
+export interface MarketplaceAdapter extends MarketplaceSearch {
   readonly platform: 'AMAZON' | 'FLIPKART';
   fetchProduct(request: FetchRequest): Promise<FetchOutcome>;
   dispose(): Promise<void>;

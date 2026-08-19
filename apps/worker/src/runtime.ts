@@ -40,6 +40,11 @@ import {
 } from '@pricetrail/queue';
 
 import { applyRetention } from './jobs/apply-retention';
+import {
+  DEFAULT_DISCOVERY_SEEDS,
+  DEFAULT_MAX_TRACKED_LISTINGS,
+  discoverCatalogue,
+} from './jobs/discover-catalogue';
 import { discoverCounterpart } from './jobs/discover-counterpart';
 import { retireStaleTracking } from './jobs/retire-stale-tracking';
 import { embedMissingListings } from './jobs/embed-listings';
@@ -115,6 +120,22 @@ export interface WorkerRuntime {
  * as "wrong secret" and sends you looking in the wrong place — so an
  * unrecognised value falls back to v3.2 rather than being passed through.
  */
+/**
+ * Seed queries for catalogue discovery.
+ *
+ * DISCOVERY_SEEDS is comma-separated. Empty entries are dropped so a trailing
+ * comma cannot inject a blank query — which searchProducts rejects anyway, but
+ * as an unavailable-search warning per run rather than anything actionable.
+ */
+function discoverySeeds(): string[] {
+  const configured = (process.env['DISCOVERY_SEEDS'] ?? '')
+    .split(',')
+    .map((seed) => seed.trim())
+    .filter((seed) => seed.length > 0);
+
+  return configured.length > 0 ? configured : DEFAULT_DISCOVERY_SEEDS;
+}
+
 function creatorsVersion(value: string | undefined): 'v3.1' | 'v3.2' | 'v3.3' {
   return value === 'v3.1' || value === 'v3.3' ? value : 'v3.2';
 }
@@ -368,6 +389,24 @@ export async function startWorkerRuntime(
             return result;
           }
 
+          case 'discover-catalogue': {
+            // Enrols products nobody searched for. Flipkart only — Amazon.in
+            // blocks scraping, and discovery there needs the Creators API.
+            const result = await discoverCatalogue({
+              prisma,
+              search: adapters.FLIPKART,
+              seeds: discoverySeeds(),
+              maxListings: Number(
+                process.env['DISCOVERY_MAX_LISTINGS'] ?? DEFAULT_MAX_TRACKED_LISTINGS,
+              ),
+              pagesPerSeed: Number(process.env['DISCOVERY_PAGES_PER_SEED'] ?? 8),
+              pageDelayMs: Number(process.env['DISCOVERY_PAGE_DELAY_MS'] ?? 2500),
+              logger,
+            });
+
+            return result;
+          }
+
           case 'retire-tracking': {
             // Retention bounds storage; this bounds work. Without it the daily
             // fetch bill grows monotonically with every URL anyone has ever
@@ -440,11 +479,39 @@ export async function startWorkerRuntime(
       { task: 'retire-tracking' },
       { pattern: '30 4 * * 0', jobId: 'repeat-retire-tracking' },
     );
+
+    // Catalogue discovery, six-hourly.
+    //
+    // Frequent because it is cheap once full: the first thing it does is COUNT
+    // tracked listings, and if that is at the cap it returns having fetched
+    // nothing. Six-hourly matters while the catalogue is still filling — it
+    // reaches the cap in a day or so rather than a month — and costs one query
+    // per run forever after.
+    //
+    // Off the hour, and clear of 02:00: discovery competing with the sweep for
+    // a small instance's connections would slow the job that actually records
+    // prices, to enrol products whose first price is not due until tomorrow
+    // anyway.
+    if (process.env['DISCOVERY_ENABLED'] !== 'false') {
+      await producer.schedule(
+        QUEUE.maintenance,
+        { task: 'discover-catalogue' },
+        { pattern: '20 */6 * * *', jobId: 'repeat-discover-catalogue' },
+      );
+    }
   }
 
   // Logged at boot because "is the API path actually on?" was previously
   // unanswerable without reading code. A silent fallback to scraping looks
   // identical to a working integration until it breaks.
+  logger.info('catalogue discovery', {
+    enabled: process.env['DISCOVERY_ENABLED'] !== 'false',
+    maxListings: Number(
+      process.env['DISCOVERY_MAX_LISTINGS'] ?? DEFAULT_MAX_TRACKED_LISTINGS,
+    ),
+    seeds: discoverySeeds().length,
+  });
+
   logger.info('marketplace sources', {
     amazonCreatorsApi: Boolean(
       process.env['AMAZON_CREATORS_CLIENT_ID'] &&

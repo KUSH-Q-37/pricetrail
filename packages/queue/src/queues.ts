@@ -71,7 +71,9 @@ export type MaintenanceTask =
   /** Drops price_points partitions older than the retention window. */
   | 'retention'
   /** Stops collecting listings nobody has searched or favourited in a long time. */
-  | 'retire-tracking';
+  | 'retire-tracking'
+  /** Enrols products nobody has searched, so the catalogue grows on its own. */
+  | 'discover-catalogue';
 
 export interface MaintenanceJob extends BaseJob {
   task: MaintenanceTask;
