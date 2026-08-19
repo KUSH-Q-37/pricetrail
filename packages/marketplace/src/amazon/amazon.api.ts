@@ -11,73 +11,109 @@ import type { ProductSearchCandidate, ProductSearchResult } from '../search';
 import { normalizeAvailability } from '../shared/availability';
 import { computeDiscountPercent } from '../shared/price';
 import { cleanText } from '../shared/text';
-import { signRequest } from './paapi-signer';
+import { CreatorsTokenProvider, type CreatorsVersion } from './creators-auth';
 
-export interface PaapiConfig {
-  accessKey: string;
-  secretKey: string;
-  /** Associates tag. PA-API rejects requests without it. */
+export interface CreatorsApiConfig {
+  /** `amzn1.application-oa2-client.…` */
+  clientId: string;
+  /** `amzn1.oa2-cs.v1.…` */
+  clientSecret: string;
+  /**
+   * Credential version, which selects the token endpoint. amazon.in
+   * credentials are v3.2 (EU) — see creators-auth.ts.
+   */
+  version?: CreatorsVersion;
+  /** Associates tracking ID. Every request is rejected without it. */
   partnerTag: string;
-  /** Defaults to the India marketplace. */
-  host?: string;
-  region?: string;
+  /** Marketplace host. Defaults to the India marketplace. */
+  marketplace?: string;
 }
 
-/**
- * PA-API GetItems batches up to 10 ASINs per call. At the initial 1 TPS floor
- * that turns a 10 000-listing sweep into ~1 000 requests / ~17 minutes,
- * against roughly 6 hours of jittered scraping.
- */
-export const PAAPI_MAX_BATCH = 10;
+/** Base host for every Creators API operation, in every region. */
+const CREATORS_API_BASE = 'https://creatorsapi.amazon';
 
+/**
+ * getItems batches ASINs in one call, exactly as PA-API's GetItems did.
+ *
+ * Ten is carried over from PA-API's documented cap. If the Creators API turns
+ * out to allow more, this is the one number to raise; if it allows fewer, the
+ * API returns a 400 naming the limit.
+ */
+export const CREATORS_MAX_BATCH = 10;
+
+/**
+ * Requested resources, in the Creators API's lowerCamelCase spelling.
+ *
+ * These are the same fields the PA-API integration asked for — the migration
+ * renamed them (`ItemInfo.Title` became `itemInfo.title`) without changing
+ * what they mean.
+ */
 const RESOURCES = [
-  'ItemInfo.Title',
-  'ItemInfo.ByLineInfo',
-  'ItemInfo.ExternalIds',
-  'ItemInfo.ManufactureInfo',
-  'ItemInfo.ProductInfo',
-  'ItemInfo.TechnicalInfo',
-  'Offers.Listings.Price',
-  'Offers.Listings.SavingBasis',
-  'Offers.Listings.Availability.Message',
-  'Offers.Listings.MerchantInfo',
-  'Images.Primary.Large',
+  'itemInfo.title',
+  'itemInfo.byLineInfo',
+  'itemInfo.externalIds',
+  'itemInfo.manufactureInfo',
+  'itemInfo.productInfo',
+  'itemInfo.technicalInfo',
+  'offers.listings.price',
+  'offers.listings.savingBasis',
+  'offers.listings.availability.message',
+  'offers.listings.merchantInfo',
+  'images.primary.large',
 ];
 
 /**
- * Amazon Product Advertising API 5.0 — the PRIMARY strategy.
+ * Amazon Creators API — the PRIMARY strategy.
  *
- * Why this beats scraping wherever it is available:
- *   - Brand, Model, PartNumber, EAN and UPC arrive as STRUCTURED fields
- *     rather than regex guesses from a spec table. Matching Layer 1 stops
- *     guessing, which is the single largest accuracy win in the project.
- *   - No anti-bot, no proxies, no layout changes.
+ * Replaces the Product Advertising API, which Amazon retired on 15 May 2026.
+ * The catalogue data is the same; what changed is the transport:
+ *
+ *   - OAuth 2.0 bearer tokens instead of AWS Signature Version 4.
+ *   - A single global host (creatorsapi.amazon) with the marketplace named in
+ *     a header, instead of a per-region webservices.amazon.* host.
+ *   - lowerCamelCase request and response fields instead of PascalCase.
+ *
+ * Why this still beats scraping wherever it is available:
+ *   - Brand, Model, PartNumber, EAN and UPC arrive as STRUCTURED fields rather
+ *     than regex guesses from a spec table. Matching Layer 1 stops guessing,
+ *     which is the single largest accuracy win in the project.
+ *   - No anti-bot, no proxies, no layout changes. Amazon.in currently answers
+ *     every scrape attempt with a bot challenge, so for Amazon this is not an
+ *     optimisation — it is the only route that works at all.
  *   - Batching makes the daily sweep ~20x faster.
  *
- * Access caveats worth confirming before depending on it: PA-API requires an
- * approved Associates account AND qualifying sales to retain credentials.
- * If access lapses, the scraping strategy is already the full implementation
- * and simply becomes primary again.
+ * Access caveats worth confirming before depending on it: credentials require
+ * an approved Associates account that has made qualifying sales. If access
+ * lapses, the scraping strategy is already the full implementation and simply
+ * becomes primary again.
  *
  * NOT VERIFIED against the live service — there are no credentials in this
- * environment. The signing steps are unit-tested for determinism and format;
- * the request/response contract follows the published PA-API 5.0 shape.
+ * environment. The request contract follows Amazon's published Creators API
+ * documentation; the response parser deliberately accepts either casing (see
+ * `prop`) because the exact response spelling is the one part of the contract
+ * the docs do not pin down unambiguously.
  */
 export class AmazonApiFetcher implements FetchStrategy {
   readonly name = 'API' as const;
 
-  private readonly host: string;
-  private readonly region: string;
+  private readonly marketplace: string;
+  private readonly tokens: CreatorsTokenProvider | undefined;
 
-  constructor(private readonly config: PaapiConfig | undefined) {
-    this.host = config?.host ?? 'webservices.amazon.in';
-    // India's PA-API endpoint is served from eu-west-1.
-    this.region = config?.region ?? 'eu-west-1';
+  constructor(private readonly config: CreatorsApiConfig | undefined) {
+    this.marketplace = config?.marketplace ?? 'www.amazon.in';
+    this.tokens =
+      config?.clientId && config?.clientSecret
+        ? new CreatorsTokenProvider({
+            clientId: config.clientId,
+            clientSecret: config.clientSecret,
+            version: config.version ?? 'v3.2',
+          })
+        : undefined;
   }
 
   isAvailable(): boolean {
     return Boolean(
-      this.config?.accessKey && this.config?.secretKey && this.config?.partnerTag,
+      this.config?.clientId && this.config?.clientSecret && this.config?.partnerTag,
     );
   }
 
@@ -86,7 +122,10 @@ export class AmazonApiFetcher implements FetchStrategy {
     const product = results.get(request.externalId);
 
     if (!product) {
-      throw new FetchError('NOT_FOUND', `PA-API returned no item for ${request.externalId}`);
+      throw new FetchError(
+        'NOT_FOUND',
+        `Creators API returned no item for ${request.externalId}`,
+      );
     }
 
     return product;
@@ -100,88 +139,55 @@ export class AmazonApiFetcher implements FetchStrategy {
     asins: string[],
     timeoutMs = 15_000,
   ): Promise<Map<string, FetchOutcome>> {
-    if (!this.config || !this.isAvailable()) {
-      throw new FetchError('UNSUPPORTED', 'PA-API credentials are not configured');
+    if (!this.config || !this.tokens || !this.isAvailable()) {
+      throw new FetchError('UNSUPPORTED', 'Creators API credentials are not configured');
     }
     if (asins.length === 0) return new Map();
-    if (asins.length > PAAPI_MAX_BATCH) {
+    if (asins.length > CREATORS_MAX_BATCH) {
       throw new FetchError(
         'UNSUPPORTED',
-        `PA-API accepts at most ${PAAPI_MAX_BATCH} items per request, got ${asins.length}`,
+        `Creators API accepts at most ${CREATORS_MAX_BATCH} items per request, got ${asins.length}`,
       );
     }
 
     const started = Date.now();
-    const path = '/paapi5/getitems';
-    const payload = JSON.stringify({
-      ItemIds: asins,
-      ItemIdType: 'ASIN',
-      Resources: RESOURCES,
-      PartnerTag: this.config.partnerTag,
-      PartnerType: 'Associates',
-      Marketplace: `www.${this.host.replace(/^webservices\./, '')}`,
-    });
-
-    const signed = signRequest({
-      method: 'POST',
-      host: this.host,
-      path,
-      region: this.region,
-      service: 'ProductAdvertisingAPI',
-      target: 'com.amazon.paapi5.v1.ProductAdvertisingAPIv1.GetItems',
-      payload,
-      accessKey: this.config.accessKey,
-      secretKey: this.config.secretKey,
-    });
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-    let response: Response;
-    try {
-      response = await fetch(`https://${this.host}${path}`, {
-        method: 'POST',
-        headers: signed.headers,
-        body: payload,
-        signal: controller.signal,
-      });
-    } catch (error) {
-      const aborted = error instanceof Error && error.name === 'AbortError';
-      throw new FetchError(aborted ? 'TIMEOUT' : 'NETWORK', 'PA-API request failed', {
-        cause: error,
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
+    const response = await this.call(
+      '/catalog/v1/getItems',
+      {
+        itemIds: asins,
+        itemIdType: 'ASIN',
+        marketplace: this.marketplace,
+        partnerTag: this.config.partnerTag,
+        resources: RESOURCES,
+      },
+      timeoutMs,
+    );
 
     if (!response.ok) {
       // 429 means the quota is spent for now. Surfaced distinctly so the
       // adapter can fall back to scraping instead of failing the job.
-      const reason =
-        response.status === 429
-          ? 'QUOTA_EXHAUSTED'
-          : response.status === 401 || response.status === 403
-            ? 'API_ERROR'
-            : 'API_ERROR';
-      throw new FetchError(reason, `PA-API HTTP ${response.status}`, {
-        httpStatus: response.status,
-      });
+      throw new FetchError(
+        response.status === 429 ? 'QUOTA_EXHAUSTED' : 'API_ERROR',
+        `Creators API HTTP ${response.status}`,
+        { httpStatus: response.status },
+      );
     }
 
-    const body = (await response.json()) as PaapiGetItemsResponse;
+    const body = (await response.json()) as unknown;
     const durationMs = Date.now() - started;
     const outcomes = new Map<string, FetchOutcome>();
 
-    for (const item of body.ItemsResult?.Items ?? []) {
-      const raw = this.toRawProduct(item);
-      const validated = validateFetchedProduct(raw);
+    for (const item of itemsFrom(body, 'itemsResult')) {
+      const asin = prop<string>(item, 'ASIN');
+      if (!asin) continue;
 
+      const validated = validateFetchedProduct(this.toRawProduct(item, asin));
       if (!validated.ok) {
         // One bad item must not discard the other nine in the batch.
         continue;
       }
 
-      outcomes.set(item.ASIN, {
+      outcomes.set(asin, {
         product: validated.data,
         strategy: this.name,
         durationMs,
@@ -195,20 +201,17 @@ export class AmazonApiFetcher implements FetchStrategy {
   /**
    * Find candidate ASINs by keywords, for counterpart discovery.
    *
-   * PA-API SearchItems, sharing this class's signer and item mapping with
-   * GetItems. It is a separate operation with its own quota, and its results
-   * are ranked by Amazon's relevance, not by any notion of equivalence — so
-   * every candidate returned here is a SUGGESTION. Deciding whether one is
-   * actually the same product is the matching engine's job, and its veto rules
-   * exist precisely because search relevance will happily return a phone case
-   * for a phone query.
-   *
-   * ItemCount is capped at 10 by the API.
+   * searchItems, sharing this class's token provider and item mapping with
+   * getItems. Its results are ranked by Amazon's relevance, not by any notion
+   * of equivalence — so every candidate returned here is a SUGGESTION.
+   * Deciding whether one is actually the same product is the matching engine's
+   * job, and its veto rules exist precisely because search relevance will
+   * happily return a phone case for a phone query.
    */
   async searchProducts(query: string, limit = 5): Promise<ProductSearchResult> {
-    if (!this.config || !this.isAvailable()) {
+    if (!this.config || !this.tokens || !this.isAvailable()) {
       // A configuration fact, not a failure: retrying changes nothing.
-      return searchUnavailable('PA-API credentials are not configured', false);
+      return searchUnavailable('Creators API credentials are not configured', false);
     }
 
     const trimmed = query.trim();
@@ -216,69 +219,51 @@ export class AmazonApiFetcher implements FetchStrategy {
       return searchUnavailable('empty query', false);
     }
 
-    const path = '/paapi5/searchitems';
-    const payload = JSON.stringify({
-      Keywords: trimmed,
-      SearchIndex: 'All',
-      ItemCount: Math.min(Math.max(limit, 1), 10),
-      Resources: RESOURCES,
-      PartnerTag: this.config.partnerTag,
-      PartnerType: 'Associates',
-      Marketplace: `www.${this.host.replace(/^webservices\./, '')}`,
-    });
-
-    const signed = signRequest({
-      method: 'POST',
-      host: this.host,
-      path,
-      region: this.region,
-      service: 'ProductAdvertisingAPI',
-      target: 'com.amazon.paapi5.v1.ProductAdvertisingAPIv1.SearchItems',
-      payload,
-      accessKey: this.config.accessKey,
-      secretKey: this.config.secretKey,
-    });
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15_000);
-
     let response: Response;
     try {
-      response = await fetch(`https://${this.host}${path}`, {
-        method: 'POST',
-        headers: signed.headers,
-        body: payload,
-        signal: controller.signal,
-      });
+      response = await this.call(
+        '/catalog/v1/searchItems',
+        {
+          keywords: trimmed,
+          itemCount: Math.min(Math.max(limit, 1), 10),
+          marketplace: this.marketplace,
+          partnerTag: this.config.partnerTag,
+          resources: RESOURCES,
+        },
+        15_000,
+      );
     } catch (error) {
-      // Network trouble is retryable, unlike missing credentials.
+      // Network trouble and token failures are retryable, unlike missing
+      // credentials. Search must never throw — a counterpart we could not look
+      // up is a gap in coverage, not a failed job.
       return searchUnavailable(
-        `PA-API search request failed: ${error instanceof Error ? error.message : 'unknown'}`,
+        `Creators API search request failed: ${error instanceof Error ? error.message : 'unknown'}`,
         true,
       );
-    } finally {
-      clearTimeout(timeout);
     }
 
     if (!response.ok) {
-      // 404 from SearchItems means "no results", which is an answer, not a
-      // fault. A spent quota (429) is retryable later today; 401/403 means the
-      // credentials are not active — PA-API issues keys before the account
-      // qualifies to use them — and no amount of retrying fixes that.
+      // 404 means "no results", which is an answer, not a fault. A spent quota
+      // (429) is retryable later today; 401/403 means the credentials are not
+      // active — Amazon issues them before an account qualifies to use them —
+      // and no amount of retrying fixes that.
       if (response.status === 404) {
         return { available: true, candidates: [] };
       }
       return searchUnavailable(
-        `PA-API search HTTP ${response.status}`,
+        `Creators API search HTTP ${response.status}`,
         response.status === 429 || response.status >= 500,
       );
     }
 
-    const body = (await response.json()) as PaapiSearchItemsResponse;
+    const body = (await response.json()) as unknown;
     const candidates: ProductSearchCandidate[] = [];
 
-    for (const item of body.SearchResult?.Items ?? []) {
-      const raw = this.toRawProduct(item);
+    for (const item of itemsFrom(body, 'searchResult')) {
+      const asin = prop<string>(item, 'ASIN');
+      if (!asin) continue;
+
+      const raw = this.toRawProduct(item, asin);
       if (!raw.title) continue;
 
       candidates.push({
@@ -298,55 +283,156 @@ export class AmazonApiFetcher implements FetchStrategy {
     return { available: true, candidates };
   }
 
-  private toRawProduct(item: PaapiItem): RawFetchedProduct {
-    const listing = item.Offers?.Listings?.[0];
-    const info = item.ItemInfo;
+  /**
+   * One authenticated POST, with a single retry after a 401.
+   *
+   * The retry matters because a cached token can stop being accepted before
+   * its stated expiry — rotating the credential does exactly that. Without it,
+   * every request until the natural expiry fails, which for an hour-long token
+   * means a whole daily sweep lost to a condition that one re-authentication
+   * would have cleared.
+   */
+  private async call(
+    path: string,
+    payload: Record<string, unknown>,
+    timeoutMs: number,
+    isRetry = false,
+  ): Promise<Response> {
+    const token = await this.tokens!.getToken();
 
-    const priceMinor = toMinor(listing?.Price?.Amount);
-    const mrpMinor = toMinor(listing?.SavingBasis?.Amount);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    let response: Response;
+    try {
+      response = await fetch(`${CREATORS_API_BASE}${path}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'x-marketplace': this.marketplace,
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      const aborted = error instanceof Error && error.name === 'AbortError';
+      throw new FetchError(aborted ? 'TIMEOUT' : 'NETWORK', 'Creators API request failed', {
+        cause: error,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (response.status === 401 && !isRetry) {
+      this.tokens!.invalidate();
+      return this.call(path, payload, timeoutMs, true);
+    }
+
+    return response;
+  }
+
+  private toRawProduct(item: unknown, asin: string): RawFetchedProduct {
+    const listing = (prop<unknown[]>(prop(item, 'Offers'), 'Listings') ?? [])[0];
+    const info = prop(item, 'ItemInfo');
+
+    const price = prop(listing, 'Price');
+    const priceMinor = toMinor(prop<number>(price, 'Amount'));
+    const mrpMinor = toMinor(prop<number>(prop(listing, 'SavingBasis'), 'Amount'));
+
+    const manufacture = prop(info, 'ManufactureInfo');
+    const model = displayValue(prop(manufacture, 'Model'));
+    const colour = displayValue(prop(prop(info, 'ProductInfo'), 'Color'));
 
     const rawAttributes: Record<string, string> = {};
-    for (const spec of info?.TechnicalInfo?.Formats?.DisplayValues ?? []) {
-      rawAttributes['Format'] = spec;
+    for (const format of displayValues(prop(prop(info, 'TechnicalInfo'), 'Formats'))) {
+      rawAttributes['Format'] = format;
     }
-    if (info?.ProductInfo?.Color?.DisplayValue) {
-      rawAttributes['Colour'] = info.ProductInfo.Color.DisplayValue;
-    }
-    if (info?.ManufactureInfo?.Model?.DisplayValue) {
-      rawAttributes['Item model number'] = info.ManufactureInfo.Model.DisplayValue;
-    }
+    if (colour) rawAttributes['Colour'] = colour;
+    if (model) rawAttributes['Item model number'] = model;
+
+    const externalIds = prop(info, 'ExternalIds');
 
     return {
       platform: 'AMAZON',
-      externalId: item.ASIN,
-      url: item.DetailPageURL,
+      externalId: asin,
+      url: prop<string>(item, 'DetailPageURL') ?? `https://${this.marketplace}/dp/${asin}`,
       source: 'API',
       fetchedAt: new Date(),
 
-      title: cleanText(info?.Title?.DisplayValue),
-      brand: cleanText(info?.ByLineInfo?.Brand?.DisplayValue) || undefined,
-      modelNumber: cleanText(info?.ManufactureInfo?.Model?.DisplayValue) || undefined,
-      mpn: cleanText(info?.ManufactureInfo?.PartNumber?.DisplayValue) || undefined,
-      ean: firstDigits(info?.ExternalIds?.EANs?.DisplayValues, 8, 14),
-      upc: firstDigits(info?.ExternalIds?.UPCs?.DisplayValues, 12, 12),
+      title: cleanText(displayValue(prop(info, 'Title'))),
+      brand: cleanText(displayValue(prop(prop(info, 'ByLineInfo'), 'Brand'))) || undefined,
+      modelNumber: cleanText(model) || undefined,
+      mpn: cleanText(displayValue(prop(manufacture, 'PartNumber'))) || undefined,
+      ean: firstDigits(displayValues(prop(externalIds, 'EANs')), 8, 14),
+      upc: firstDigits(displayValues(prop(externalIds, 'UPCs')), 12, 12),
 
-      currency: listing?.Price?.Currency ?? 'INR',
+      currency: prop<string>(price, 'Currency') ?? 'INR',
       priceMinor,
       mrpMinor,
       discountPercent: computeDiscountPercent(priceMinor, mrpMinor),
-      availability: normalizeAvailability(listing?.Availability?.Message),
+      availability: normalizeAvailability(
+        prop<string>(prop(listing, 'Availability'), 'Message'),
+      ),
 
-      sellerName: cleanText(listing?.MerchantInfo?.Name) || undefined,
-      imageUrl: item.Images?.Primary?.Large?.URL,
+      sellerName:
+        cleanText(prop<string>(prop(listing, 'MerchantInfo'), 'Name')) || undefined,
+      imageUrl: prop<string>(prop(prop(prop(item, 'Images'), 'Primary'), 'Large'), 'URL'),
 
       rawAttributes,
-      platformData: { source: 'paapi5' },
+      platformData: { source: 'creators-api' },
     };
   }
 }
 
 /**
- * PA-API returns Amount as a decimal number of rupees (1299.5), not paise.
+ * Case-insensitive property read.
+ *
+ * The Creators API migration renamed request AND response fields to
+ * lowerCamelCase, but the published examples are not consistent enough to pin
+ * every response key with confidence — `parentASIN` implies `ASIN` becomes
+ * `asin` and `EANs` becomes `eANs`, which is mechanical but odd enough that it
+ * is worth not betting the integration on.
+ *
+ * Reading case-insensitively costs one lowercase comparison per field and
+ * makes the parser correct under either spelling, including a future
+ * correction to one of them. Every key we read is unique within its object
+ * ignoring case, so there is no ambiguity to resolve.
+ */
+function prop<T = unknown>(source: unknown, name: string): T | undefined {
+  if (source === null || typeof source !== 'object') return undefined;
+
+  const record = source as Record<string, unknown>;
+  if (name in record) return record[name] as T;
+
+  const lower = name.toLowerCase();
+  for (const key of Object.keys(record)) {
+    if (key.toLowerCase() === lower) return record[key] as T;
+  }
+
+  return undefined;
+}
+
+/** `{ displayValue: "…" }` wrappers, under either casing. */
+function displayValue(source: unknown): string | undefined {
+  return prop<string>(source, 'DisplayValue');
+}
+
+function displayValues(source: unknown): string[] {
+  const values = prop<unknown>(source, 'DisplayValues');
+  return Array.isArray(values)
+    ? values.filter((value): value is string => typeof value === 'string')
+    : [];
+}
+
+/** `itemsResult.items` / `searchResult.items`, under either casing. */
+function itemsFrom(body: unknown, container: string): unknown[] {
+  const items = prop<unknown>(prop(body, container), 'Items');
+  return Array.isArray(items) ? items : [];
+}
+
+/**
+ * The API returns Amount as a decimal number of rupees (1299.5), not paise.
  * Multiplying by 100 in floating point then truncating loses a paisa on values
  * like 1299.5 -> 129949.99999; rounding is required, not optional.
  */
@@ -355,52 +441,10 @@ function toMinor(amount: number | undefined): number | undefined {
   return Math.round(amount * 100);
 }
 
-function firstDigits(
-  values: string[] | undefined,
-  min: number,
-  max: number,
-): string | undefined {
-  for (const value of values ?? []) {
+function firstDigits(values: string[], min: number, max: number): string | undefined {
+  for (const value of values) {
     const digits = value.replace(/\D/g, '');
     if (digits.length >= min && digits.length <= max) return digits;
   }
   return undefined;
-}
-
-// --- Minimal response typings for the resources we request ------------------
-interface PaapiSearchItemsResponse {
-  SearchResult?: { Items?: PaapiItem[] };
-}
-
-interface PaapiGetItemsResponse {
-  ItemsResult?: { Items?: PaapiItem[] };
-  Errors?: Array<{ Code: string; Message: string }>;
-}
-
-interface PaapiItem {
-  ASIN: string;
-  DetailPageURL: string;
-  Images?: { Primary?: { Large?: { URL: string } } };
-  ItemInfo?: {
-    Title?: { DisplayValue: string };
-    ByLineInfo?: { Brand?: { DisplayValue: string } };
-    ExternalIds?: {
-      EANs?: { DisplayValues: string[] };
-      UPCs?: { DisplayValues: string[] };
-    };
-    ManufactureInfo?: {
-      Model?: { DisplayValue: string };
-      PartNumber?: { DisplayValue: string };
-    };
-    ProductInfo?: { Color?: { DisplayValue: string } };
-    TechnicalInfo?: { Formats?: { DisplayValues: string[] } };
-  };
-  Offers?: {
-    Listings?: Array<{
-      Price?: { Amount: number; Currency: string };
-      SavingBasis?: { Amount: number };
-      Availability?: { Message?: string };
-      MerchantInfo?: { Name?: string };
-    }>;
-  };
 }

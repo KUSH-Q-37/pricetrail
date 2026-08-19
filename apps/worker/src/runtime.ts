@@ -107,6 +107,18 @@ export interface WorkerRuntime {
  * That is the whole trade-off, and it is a deployment decision rather than a
  * code one.
  */
+/**
+ * Validate AMAZON_CREATORS_VERSION, defaulting to the amazon.in value.
+ *
+ * The version is stamped on the credential by Amazon and decides which OAuth
+ * host issues its token. A typo here surfaces as `invalid_client`, which reads
+ * as "wrong secret" and sends you looking in the wrong place — so an
+ * unrecognised value falls back to v3.2 rather than being passed through.
+ */
+function creatorsVersion(value: string | undefined): 'v3.1' | 'v3.2' | 'v3.3' {
+  return value === 'v3.1' || value === 'v3.3' ? value : 'v3.2';
+}
+
 const POLL_BUDGET = {
   /** Seconds a blocking read waits before re-issuing. BullMQ's own default. */
   drainDelay: Number(process.env['QUEUE_DRAIN_DELAY'] ?? 5),
@@ -139,14 +151,19 @@ export async function startWorkerRuntime(
 
   const adapters: Record<Platform, MarketplaceAdapter> = {
     AMAZON: new AmazonAdapter({
-      paapi:
-        process.env['PAAPI_ACCESS_KEY'] &&
-        process.env['PAAPI_SECRET_KEY'] &&
-        process.env['PAAPI_PARTNER_TAG']
+      // Amazon retired PA-API on 15 May 2026; these are Creators API
+      // credentials. AMAZON_CREATORS_VERSION selects the OAuth token endpoint
+      // and defaults to v3.2, which is the one that covers amazon.in — Amazon
+      // groups India with EU, not with the Far East marketplaces.
+      creators:
+        process.env['AMAZON_CREATORS_CLIENT_ID'] &&
+        process.env['AMAZON_CREATORS_CLIENT_SECRET'] &&
+        process.env['AMAZON_CREATORS_PARTNER_TAG']
           ? {
-              accessKey: process.env['PAAPI_ACCESS_KEY'],
-              secretKey: process.env['PAAPI_SECRET_KEY'],
-              partnerTag: process.env['PAAPI_PARTNER_TAG'],
+              clientId: process.env['AMAZON_CREATORS_CLIENT_ID'],
+              clientSecret: process.env['AMAZON_CREATORS_CLIENT_SECRET'],
+              partnerTag: process.env['AMAZON_CREATORS_PARTNER_TAG'],
+              version: creatorsVersion(process.env['AMAZON_CREATORS_VERSION']),
             }
           : undefined,
       onStrategyFallback: (info) => logger.warn('fetch strategy escalated', { ...info }),
@@ -429,10 +446,10 @@ export async function startWorkerRuntime(
   // unanswerable without reading code. A silent fallback to scraping looks
   // identical to a working integration until it breaks.
   logger.info('marketplace sources', {
-    amazonPaapi: Boolean(
-      process.env['PAAPI_ACCESS_KEY'] &&
-        process.env['PAAPI_SECRET_KEY'] &&
-        process.env['PAAPI_PARTNER_TAG'],
+    amazonCreatorsApi: Boolean(
+      process.env['AMAZON_CREATORS_CLIENT_ID'] &&
+        process.env['AMAZON_CREATORS_CLIENT_SECRET'] &&
+        process.env['AMAZON_CREATORS_PARTNER_TAG'],
     ),
     flipkartAffiliate: Boolean(
       process.env['FLIPKART_AFFILIATE_ID'] && process.env['FLIPKART_AFFILIATE_TOKEN'],

@@ -81,9 +81,9 @@ async function main(): Promise<void> {
   }
 
   // --- live mode ----------------------------------------------------------
-  const paapiKey = process.env['PAAPI_ACCESS_KEY'];
-  const paapiSecret = process.env['PAAPI_SECRET_KEY'];
-  const paapiTag = process.env['PAAPI_PARTNER_TAG'];
+  const creatorsId = process.env['AMAZON_CREATORS_CLIENT_ID'];
+  const creatorsSecret = process.env['AMAZON_CREATORS_CLIENT_SECRET'];
+  const creatorsTag = process.env['AMAZON_CREATORS_PARTNER_TAG'];
 
   const onStrategyFallback = (info: { from: string; reason: string }) =>
     console.log(`  ! ${info.from} failed (${info.reason}) — escalating`);
@@ -91,9 +91,13 @@ async function main(): Promise<void> {
   const adapter: MarketplaceAdapter =
     parsed.platform === 'AMAZON'
       ? new AmazonAdapter({
-          paapi:
-            paapiKey && paapiSecret && paapiTag
-              ? { accessKey: paapiKey, secretKey: paapiSecret, partnerTag: paapiTag }
+          creators:
+            creatorsId && creatorsSecret && creatorsTag
+              ? {
+                  clientId: creatorsId,
+                  clientSecret: creatorsSecret,
+                  partnerTag: creatorsTag,
+                }
               : undefined,
           onStrategyFallback,
         })

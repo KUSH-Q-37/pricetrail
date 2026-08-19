@@ -17,7 +17,7 @@ export * from './amazon/selectors';
 export * from './amazon/amazon.parser';
 export * from './amazon/amazon.api';
 export * from './amazon/amazon.adapter';
-export * from './amazon/paapi-signer';
+export * from './amazon/creators-auth';
 
 export * from './flipkart/selectors';
 export * from './flipkart/json-ld';

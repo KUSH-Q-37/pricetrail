@@ -24,7 +24,11 @@ import { HttpFetcher } from '../src/fetch/http-fetcher';
 import { PlaywrightFetcher } from '../src/fetch/playwright-fetcher';
 import { BrowserPool } from '../src/browser/browser-pool';
 import { FetchError } from '../src/adapter';
-import { signRequest, toAmzDate, toDateStamp } from '../src/amazon/paapi-signer';
+import {
+  CREATORS_TOKEN_ENDPOINT,
+  CreatorsTokenProvider,
+} from '../src/amazon/creators-auth';
+import { AmazonApiFetcher } from '../src/amazon/amazon.api';
 
 let passed = 0;
 let failed = 0;
@@ -87,55 +91,129 @@ async function main(): Promise<void> {
 
   try {
     // -----------------------------------------------------------------------
-    section('SIGV4 SIGNER (deterministic, format-checked)');
+    section('CREATORS API AUTH (offline, stubbed transport)');
     // -----------------------------------------------------------------------
     {
-      const fixedDate = new Date('2026-08-06T12:34:56.000Z');
-      check('amz date format', toAmzDate(fixedDate), '20260806T123456Z');
-      check('date stamp format', toDateStamp(fixedDate), '20260806');
+      // India is EU. This is the single most error-prone fact in the
+      // integration: amazon.in credentials are v3.2 and authenticate against
+      // the UK host, not the Japanese one. Asserted so a "tidy-up" that moves
+      // IN to Far East fails here instead of in production.
+      check('india (v3.2) tokens come from the EU host',
+        CREATORS_TOKEN_ENDPOINT['v3.2'], 'https://api.amazon.co.uk/auth/o2/token');
+      check('NA host', CREATORS_TOKEN_ENDPOINT['v3.1'], 'https://api.amazon.com/auth/o2/token');
+      check('FE host', CREATORS_TOKEN_ENDPOINT['v3.3'], 'https://api.amazon.co.jp/auth/o2/token');
 
-      const signed = signRequest({
-        method: 'POST',
-        host: 'webservices.amazon.in',
-        path: '/paapi5/getitems',
-        region: 'eu-west-1',
-        service: 'ProductAdvertisingAPI',
-        target: 'com.amazon.paapi5.v1.ProductAdvertisingAPIv1.GetItems',
-        payload: '{"ItemIds":["B0CHX1W1XY"]}',
-        accessKey: 'AKIAEXAMPLE',
-        secretKey: 'secretexamplekey',
-        now: fixedDate,
+      const credentials = {
+        clientId: 'amzn1.application-oa2-client.test',
+        clientSecret: 'amzn1.oa2-cs.v1.test',
+        version: 'v3.2' as const,
+      };
+
+      // --- caching ---------------------------------------------------------
+      let calls = 0;
+      let lastUrl = '';
+      let lastBody: Record<string, unknown> = {};
+      const stub = (async (url: string | URL, init?: RequestInit) => {
+        calls += 1;
+        lastUrl = String(url);
+        lastBody = JSON.parse(String(init?.body ?? '{}'));
+        return new Response(
+          JSON.stringify({ access_token: `token-${calls}`, expires_in: 3600, token_type: 'bearer' }),
+          { status: 200 },
+        );
+      }) as unknown as typeof fetch;
+
+      const provider = new CreatorsTokenProvider(credentials, stub);
+      check('first getToken fetches', await provider.getToken(), 'token-1');
+      check('second getToken reuses the cached token', await provider.getToken(), 'token-1');
+      check('only one token request was made', calls, 1);
+      check('token request went to the EU host', lastUrl, CREATORS_TOKEN_ENDPOINT['v3.2']);
+      check('grant type is client_credentials', lastBody['grant_type'], 'client_credentials');
+      check('scope is the creators default', lastBody['scope'], 'creatorsapi::default');
+
+      // A revoked credential is the reason invalidate() exists — without it a
+      // rotated secret breaks every request until the token expires an hour
+      // later.
+      provider.invalidate();
+      check('invalidate forces a refetch', await provider.getToken(), 'token-2');
+
+      // --- concurrent cold start -------------------------------------------
+      // A sweep firing several requests at once must not send several
+      // identical token requests.
+      let concurrentCalls = 0;
+      const slowStub = (async () => {
+        concurrentCalls += 1;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return new Response(
+          JSON.stringify({ access_token: 'shared', expires_in: 3600 }),
+          { status: 200 },
+        );
+      }) as unknown as typeof fetch;
+
+      const concurrent = new CreatorsTokenProvider(credentials, slowStub);
+      const tokens = await Promise.all([
+        concurrent.getToken(), concurrent.getToken(), concurrent.getToken(),
+      ]);
+      check('concurrent callers share one token request', concurrentCalls, 1);
+      check('all callers get the same token', tokens.join(','), 'shared,shared,shared');
+
+      // --- expiry margin ----------------------------------------------------
+      // A token valid for less than the safety margin must never be cached: it
+      // would expire mid-flight on the request it was attached to.
+      let shortCalls = 0;
+      const shortStub = (async () => {
+        shortCalls += 1;
+        return new Response(
+          JSON.stringify({ access_token: `short-${shortCalls}`, expires_in: 30 }),
+          { status: 200 },
+        );
+      }) as unknown as typeof fetch;
+
+      const shortLived = new CreatorsTokenProvider(credentials, shortStub);
+      await shortLived.getToken();
+      await shortLived.getToken();
+      check('a token shorter than the margin is not cached', shortCalls, 2);
+
+      // --- failure surfacing -------------------------------------------------
+      const failing = new CreatorsTokenProvider(
+        credentials,
+        (async () => new Response('{"error":"invalid_client"}', { status: 401 })) as unknown as typeof fetch,
+      );
+      let message = '';
+      try {
+        await failing.getToken();
+      } catch (error) {
+        message = error instanceof Error ? error.message : '';
+      }
+      check('auth failure names the status', message.includes('401'), true);
+      check('auth failure carries Amazon reason', message.includes('invalid_client'), true);
+    }
+
+    // -----------------------------------------------------------------------
+    section('CREATORS API FETCHER (unconfigured behaviour)');
+    // -----------------------------------------------------------------------
+    {
+      // No credentials in this environment, and none on a fresh deployment.
+      // The contract that matters is that this degrades to "unavailable, do
+      // not retry" rather than throwing — counterpart discovery treats an
+      // unavailable marketplace as a coverage gap, not a failed job.
+      const unconfigured = new AmazonApiFetcher(undefined);
+      check('unconfigured fetcher reports unavailable', unconfigured.isAvailable(), false);
+
+      const result = await unconfigured.searchProducts('any query');
+      check('search is unavailable without credentials', result.available, false);
+      check('missing credentials are not retryable',
+        result.available === false ? result.retryable : true, false);
+
+      // Partial configuration is the realistic failure: a client id pasted in
+      // and the partner tag forgotten. It must read as unconfigured, not as a
+      // working integration that fails on every call.
+      const partial = new AmazonApiFetcher({
+        clientId: 'amzn1.application-oa2-client.test',
+        clientSecret: 'amzn1.oa2-cs.v1.test',
+        partnerTag: '',
       });
-
-      check('signature is 64 hex chars', /^[0-9a-f]{64}$/.test(signed.signature), true);
-      check('headers are lowercase + sorted in the canonical request',
-        signed.canonicalRequest.split('\n').slice(3, 8).join(','),
-        'content-encoding:amz-1.0,content-type:application/json; charset=utf-8,host:webservices.amazon.in,x-amz-date:20260806T123456Z,x-amz-target:com.amazon.paapi5.v1.ProductAdvertisingAPIv1.GetItems');
-      check('string-to-sign starts with the algorithm',
-        signed.stringToSign.startsWith('AWS4-HMAC-SHA256\n20260806T123456Z\n20260806/eu-west-1/ProductAdvertisingAPI/aws4_request'), true);
-      check('authorization header shape',
-        /^AWS4-HMAC-SHA256 Credential=AKIAEXAMPLE\/20260806\/eu-west-1\/ProductAdvertisingAPI\/aws4_request, SignedHeaders=content-encoding;content-type;host;x-amz-date;x-amz-target, Signature=[0-9a-f]{64}$/.test(
-          signed.headers['Authorization'] ?? ''), true);
-
-      // Same inputs must always produce the same signature.
-      const again = signRequest({
-        method: 'POST', host: 'webservices.amazon.in', path: '/paapi5/getitems',
-        region: 'eu-west-1', service: 'ProductAdvertisingAPI',
-        target: 'com.amazon.paapi5.v1.ProductAdvertisingAPIv1.GetItems',
-        payload: '{"ItemIds":["B0CHX1W1XY"]}', accessKey: 'AKIAEXAMPLE',
-        secretKey: 'secretexamplekey', now: fixedDate,
-      });
-      check('signing is deterministic', again.signature, signed.signature);
-
-      const differentPayload = signRequest({
-        method: 'POST', host: 'webservices.amazon.in', path: '/paapi5/getitems',
-        region: 'eu-west-1', service: 'ProductAdvertisingAPI',
-        target: 'com.amazon.paapi5.v1.ProductAdvertisingAPIv1.GetItems',
-        payload: '{"ItemIds":["B0DIFFERENT"]}', accessKey: 'AKIAEXAMPLE',
-        secretKey: 'secretexamplekey', now: fixedDate,
-      });
-      check('payload change alters the signature',
-        differentPayload.signature !== signed.signature, true);
+      check('missing partner tag counts as unconfigured', partial.isAvailable(), false);
     }
 
     // -----------------------------------------------------------------------

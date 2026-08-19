@@ -9,12 +9,12 @@ import {
 import { BrowserPool, type BrowserPoolOptions } from '../browser/browser-pool';
 import { HttpFetcher } from '../fetch/http-fetcher';
 import { PlaywrightFetcher } from '../fetch/playwright-fetcher';
-import { AmazonApiFetcher, type PaapiConfig } from './amazon.api';
+import { AmazonApiFetcher, type CreatorsApiConfig } from './amazon.api';
 import { parseAmazonProduct } from './amazon.parser';
 import { AMAZON_SELECTORS } from './selectors';
 
 export interface AmazonAdapterOptions {
-  paapi?: PaapiConfig;
+  creators?: CreatorsApiConfig;
   browser?: BrowserPoolOptions;
   /** Disable the browser fallback (e.g. where Chromium is not installed). */
   enableBrowserFallback?: boolean;
@@ -52,7 +52,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
   private playwright: PlaywrightFetcher | undefined;
 
   constructor(private readonly options: AmazonAdapterOptions = {}) {
-    this.api = new AmazonApiFetcher(options.paapi);
+    this.api = new AmazonApiFetcher(options.creators);
     this.http = new HttpFetcher(parseAmazonProduct, { fetchImpl: options.fetchImpl });
   }
 
