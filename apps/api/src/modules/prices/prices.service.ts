@@ -78,9 +78,18 @@ export class PricesService {
 
     const series = await Promise.all(
       listings.map(async (listing) => {
+        // Overlap, not containment. A row is an interval, and the one that
+        // covers the start of the window almost always BEGAN before it — a
+        // price set in June and still holding in August is a single row with
+        // captured_on in June. Filtering on captured_on >= from would discard
+        // exactly the row that describes most of the window.
         const rows = await this.prisma.pricePoint.findMany({
-          where: { listingId: listing.id, capturedOn: { gte: from, lte: to } },
-          select: { capturedOn: true, priceMinor: true },
+          where: {
+            listingId: listing.id,
+            capturedOn: { lte: to },
+            lastConfirmedOn: { gte: from },
+          },
+          select: { capturedOn: true, lastConfirmedOn: true, priceMinor: true },
           orderBy: { capturedOn: 'asc' },
         });
 
@@ -132,23 +141,40 @@ export class PricesService {
   }
 
   /**
-   * Expand sparse observations into one slot per day, with null where nothing
-   * was recorded.
+   * Expand change intervals into one slot per day, with null where nothing was
+   * recorded.
    *
-   * THIS IS THE HONESTY MECHANISM. price_points holds a row only for days a
-   * fetch succeeded. Sending just those rows to a time-axis chart draws a
-   * straight line across a two-week outage — inventing a smooth price history
-   * for a period we know nothing about. Emitting explicit nulls lets the
-   * renderer break the line, so a gap looks like a gap.
+   * THIS IS THE HONESTY MECHANISM. Storage is compressed — a row exists only
+   * where the price CHANGED, and carries the last day it was confirmed still
+   * holding. Expanding here means the chart receives the same dense daily
+   * series it always did: a flat price renders as a straight line because
+   * every day in the interval genuinely was checked and genuinely was that
+   * price.
+   *
+   * What must NOT happen is filling days no interval covers. Those were never
+   * observed, and drawing through them would invent a smooth price history for
+   * a period we know nothing about — which is the exact claim this project
+   * exists to argue against. They stay null, the renderer breaks the line, and
+   * a gap looks like a gap.
+   *
+   * The distinction survives compression only because the writer refuses to
+   * extend an interval across a missed day. A flat price and an outage are
+   * both "no new rows"; only last_confirmed_on tells them apart.
    */
   private toDenseDailySeries(
-    rows: Array<{ capturedOn: Date; priceMinor: number }>,
+    rows: Array<{ capturedOn: Date; lastConfirmedOn: Date; priceMinor: number }>,
     from: Date,
     days: number,
   ): SeriesPoint[] {
     const byDay = new Map<number, number>();
     for (const row of rows) {
-      byDay.set(startOfUtcDay(row.capturedOn).getTime(), row.priceMinor);
+      // Every day the interval covers, clamped to the requested window.
+      const start = startOfUtcDay(row.capturedOn).getTime();
+      const end = startOfUtcDay(row.lastConfirmedOn).getTime();
+
+      for (let day = start; day <= end; day += DAY_MS) {
+        byDay.set(day, row.priceMinor);
+      }
     }
 
     const dense: SeriesPoint[] = [];
@@ -165,6 +191,8 @@ export class PricesService {
     return firstObserved <= 0 ? dense : dense.slice(firstObserved);
   }
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function startOfUtcDay(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));

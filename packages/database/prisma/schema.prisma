@@ -307,10 +307,20 @@ model MarketplaceListing {
 model PricePoint {
   listingId String @map("listing_id") @db.Uuid
 
-  /// Partition key and daily identity (UTC date).
+  /// Partition key, and the day this price took effect (business date).
   capturedOn DateTime @map("captured_on") @db.Date
 
-  /// Exact observation instant, for intra-day forensics.
+  /// The last day this price was actually observed to still hold.
+  ///
+  /// Rows are CHANGE INTERVALS, not daily snapshots: a price is written once
+  /// and this date is extended each day it is still there. captured_on ..
+  /// last_confirmed_on is a closed interval of days genuinely CHECKED, which
+  /// is what keeps "the price did not move" distinguishable from "we were not
+  /// collecting". Extending it across a day that was missed would claim an
+  /// observation that never happened.
+  lastConfirmedOn DateTime @map("last_confirmed_on") @db.Date
+
+  /// Exact instant of the MOST RECENT observation in this interval.
   capturedAt DateTime @map("captured_at") @db.Timestamptz(3)
 
   currency        String       @default("INR") @db.Char(3)
@@ -325,6 +335,7 @@ model PricePoint {
   listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
   @@id([listingId, capturedOn])
+  @@index([listingId, lastConfirmedOn(sort: Desc)], map: "price_points_listing_confirmed_idx")
   @@map("price_points")
 }
 

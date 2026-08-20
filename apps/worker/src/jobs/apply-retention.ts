@@ -3,6 +3,12 @@ import { businessMonthStartMinusMonths, type PrismaClient } from '@pricetrail/da
 export interface RetentionResult {
   retentionMonths: number;
   cutoff: string;
+  /**
+   * Intervals re-anchored at the cutoff because they began before it and are
+   * still live. Normally zero; non-zero means a price held across the whole
+   * retention window, which is worth seeing rather than inferring.
+   */
+  carriedForward: number;
   dropped: string[];
 }
 
@@ -43,6 +49,37 @@ export async function applyRetention(
   const cutoffDate = businessMonthStartMinusMonths(retentionMonths, options.now ?? new Date());
   const cutoff = cutoffDate.toISOString().slice(0, 10);
 
+  // Carry forward any interval that STARTS before the cutoff but is still
+  // live, before the partition holding it is dropped.
+  //
+  // Rows are change intervals now, so a price set eighteen months ago and
+  // unchanged since is a single row sitting in an eighteen-month-old
+  // partition — while describing today. Dropping that partition would delete
+  // the current price and leave the product with no history at all, which is
+  // the exact opposite of what a retention window is supposed to do.
+  //
+  // The fix is to re-anchor it at the cutoff: insert an equivalent row dated
+  // the first retained day, keeping its last_confirmed_on. The old row then
+  // drops harmlessly with its partition, and no observation is invented —
+  // every day the new row claims was already claimed by the old one.
+  //
+  // ON CONFLICT DO NOTHING because a row may already exist at the cutoff date
+  // if the price changed that very day; the existing one is the more precise
+  // record and must win.
+  const carried = await prisma.$executeRaw`
+    INSERT INTO price_points (
+      listing_id, captured_on, last_confirmed_on, captured_at,
+      currency, price_minor, mrp_minor, discount_percent, availability, source
+    )
+    SELECT
+      listing_id, ${cutoff}::date, last_confirmed_on, captured_at,
+      currency, price_minor, mrp_minor, discount_percent, availability, source
+    FROM price_points
+    WHERE captured_on < ${cutoff}::date
+      AND last_confirmed_on >= ${cutoff}::date
+    ON CONFLICT (listing_id, captured_on) DO NOTHING
+  `;
+
   // dry_run = false. The SQL function defaults to true precisely so that a
   // caller has to say this out loud.
   const rows = await prisma.$queryRaw<Array<{ partition_name: string; action: string }>>`
@@ -53,6 +90,7 @@ export async function applyRetention(
   return {
     retentionMonths,
     cutoff,
+    carriedForward: carried,
     dropped: rows.map((row) => row.partition_name),
   };
 }

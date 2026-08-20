@@ -62,6 +62,14 @@ function utcDay(daysAgo: number): Date {
 interface PricePointSeed {
   listingId: string;
   capturedOn: Date;
+  /**
+   * Seeded history keeps one row per day, so each is a one-day interval.
+   *
+   * The generator deliberately skips ~3% of days to simulate failed fetches.
+   * Merging those into multi-day intervals would paper over exactly the gaps
+   * the chart is supposed to render honestly.
+   */
+  lastConfirmedOn: Date;
   capturedAt: Date;
   priceMinor: number;
   mrpMinor: number;
@@ -109,6 +117,8 @@ function generateHistory(
     points.push({
       listingId,
       capturedOn,
+      // One-day interval: seeded history is one row per day by design.
+      lastConfirmedOn: capturedOn,
       capturedAt,
       priceMinor: price,
       mrpMinor,

@@ -127,8 +127,12 @@ export class HealthController {
   private async observationFreshness(): Promise<ReadinessReport['observations']> {
     try {
       const newest = await this.prisma.pricePoint.findFirst({
-        orderBy: { capturedOn: 'desc' },
-        select: { capturedOn: true },
+        // lastConfirmedOn, not capturedOn. Rows are change intervals: a price
+        // set three weeks ago and confirmed again this morning has an old
+        // captured_on, and ordering by it would report the tracker as three
+        // weeks stale while it was in fact working perfectly.
+        orderBy: { lastConfirmedOn: 'desc' },
+        select: { lastConfirmedOn: true },
       });
 
       if (!newest) {
@@ -136,11 +140,11 @@ export class HealthController {
       }
 
       const ageHours = Math.floor(
-        (Date.now() - newest.capturedOn.getTime()) / (1000 * 60 * 60),
+        (Date.now() - newest.lastConfirmedOn.getTime()) / (1000 * 60 * 60),
       );
 
       return {
-        newestCapturedOn: newest.capturedOn.toISOString(),
+        newestCapturedOn: newest.lastConfirmedOn.toISOString(),
         ageHours,
         stale: ageHours > MAX_OBSERVATION_AGE_HOURS,
       };

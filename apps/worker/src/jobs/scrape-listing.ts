@@ -6,6 +6,7 @@ import {
   ProductStatus,
   ScrapeJobStatus,
   businessDate,
+  businessDateMinusDays,
   type PrismaClient,
 } from '@pricetrail/database';
 import {
@@ -276,21 +277,63 @@ export async function scrapeListing(
       source: product.source as DataSource,
     };
 
-    const before = await tx.pricePoint.findUnique({
-      where: { listingId_capturedOn: { listingId: input.listingId, capturedOn } },
-      select: { priceMinor: true },
+    // Rows are CHANGE INTERVALS. A price is written once and its
+    // last_confirmed_on extended for each day it is still there, so a phone
+    // sitting at one price for sixty days costs one row rather than sixty.
+    const latest = await tx.pricePoint.findFirst({
+      where: { listingId: input.listingId },
+      orderBy: { capturedOn: 'desc' },
+      select: { capturedOn: true, lastConfirmedOn: true, priceMinor: true },
     });
 
+    // Extend only when this observation genuinely continues the last one.
+    //
+    // Two conditions, and the second is the one that is easy to miss. The
+    // price must match — otherwise it is a new interval by definition. And the
+    // previous check must have been YESTERDAY or TODAY: if a day was missed,
+    // extending across it would assert an observation that never happened, and
+    // the gap this project takes care to display would silently close up.
+    //
+    // So an unchanged price after an outage still opens a NEW interval. That
+    // is not a redundant row; it is the record that the days between were
+    // never seen.
+    const yesterday = businessDateMinusDays(1, finishedAt);
+    const continuesLastInterval =
+      latest !== null &&
+      latest.priceMinor === product.priceMinor &&
+      (sameDay(latest.lastConfirmedOn, yesterday) ||
+        sameDay(latest.lastConfirmedOn, capturedOn));
+
+    if (continuesLastInterval) {
+      await tx.pricePoint.update({
+        where: {
+          listingId_capturedOn: {
+            listingId: input.listingId,
+            capturedOn: latest.capturedOn,
+          },
+        },
+        // The non-price fields track the LATEST observation in the interval.
+        // MRP and availability can move while the price holds, and carrying
+        // the stale ones forward would misreport today to save a row.
+        data: { ...payload, priceMinor: latest.priceMinor, lastConfirmedOn: capturedOn },
+      });
+
+      // Not news: the price is exactly where it was yesterday.
+      return false;
+    }
+
+    // A new price, a first observation, or the first check after a gap.
+    //
+    // Upsert rather than create: BullMQ redelivers a job whose worker died
+    // after the write but before the ack, and re-applying the same values must
+    // be a no-op rather than a primary-key violation.
     await tx.pricePoint.upsert({
       where: { listingId_capturedOn: { listingId: input.listingId, capturedOn } },
-      create: { listingId: input.listingId, capturedOn, ...payload },
-      update: payload,
+      create: { listingId: input.listingId, capturedOn, lastConfirmedOn: capturedOn, ...payload },
+      update: { ...payload, lastConfirmedOn: capturedOn },
     });
 
-    // "Did today's record change?" — true for a first observation, and for a
-    // later one that moved the price. A re-run returning the same number is
-    // not news and should not read as one.
-    return before === null || before.priceMinor !== product.priceMinor;
+    return latest === null || latest.priceMinor !== product.priceMinor;
   });
 
   await prisma.scrapeJob.update({
@@ -311,4 +354,20 @@ export async function scrapeListing(
     pricePointWritten: written,
     paused: false,
   };
+}
+
+/**
+ * Whether two dates fall on the same calendar day.
+ *
+ * Both are DATE columns or business dates, so they are already normalized to
+ * midnight — but comparing Date objects with === compares references, and
+ * getTime() equality would break the moment one side arrived with a time
+ * component. Comparing the parts is the version that stays correct.
+ */
+function sameDay(a: Date, b: Date): boolean {
+  return (
+    a.getUTCFullYear() === b.getUTCFullYear() &&
+    a.getUTCMonth() === b.getUTCMonth() &&
+    a.getUTCDate() === b.getUTCDate()
+  );
 }
