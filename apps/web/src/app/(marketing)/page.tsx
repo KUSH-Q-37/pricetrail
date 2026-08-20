@@ -3,8 +3,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight, CalendarClock, LineChart, Link2, ShieldCheck } from 'lucide-react';
 
+import { AmbientCanvas } from '@/components/ambient/ambient-canvas';
 import { HeroPriceCard } from '@/components/marketing/hero-price-card';
 import { Reveal } from '@/components/marketing/reveal';
+import { Magnetic } from '@/components/motion/magnetic';
+import { Parallax } from '@/components/motion/parallax';
+import { Tilt } from '@/components/motion/tilt';
 
 export const metadata: Metadata = {
   title: 'PriceTrail — Amazon & Flipkart price history for Indian shoppers',
@@ -71,8 +75,21 @@ export default function LandingPage() {
         scroll.
       */}
       <section className="relative overflow-hidden px-4 pb-20 pt-16 sm:pt-24">
+        {/*
+          Three background layers, deliberately in this order — each one is
+          doing a different job and none of them would carry the section alone:
+
+            1. `ambient`      a soft accent-tinted wash. Light, not a graphic.
+            2. `grid-texture` a plotted-paper nod, masked away before any text.
+            3. AmbientCanvas  the point mesh and the drifting price ribbons.
+
+          The canvas sits on top of the two CSS layers because its dots need the
+          wash BEHIND them to have anything to catch the light against; under
+          them it reads as noise trapped beneath a pane of glass.
+        */}
         <div className="ambient ambient--drift" aria-hidden="true" />
         <div className="grid-texture" aria-hidden="true" />
+        <AmbientCanvas />
 
         <div className="relative mx-auto grid w-full max-w-7xl items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,520px)] lg:gap-16">
           {/* --- the argument -------------------------------------------- */}
@@ -94,11 +111,24 @@ export default function LandingPage() {
               >
                 Is that discount
               </span>
+              {/*
+                The one gradient on the site, on the one word the whole page
+                turns on. A second would cost this one all of its effect, and a
+                gradient never goes on anything a reader has to work through —
+                it costs contrast, and "real?" is a word you recognise by shape.
+
+                NESTED, NOT COMBINED. `stagger-in` and `text-gradient` both use
+                the `animation` shorthand, so on one element the cascade drops
+                one of them outright rather than merging the two. When the loser
+                is `stagger-in` — which starts at opacity 0 and depends on its
+                animation to become visible — the word disappears entirely.
+                Two elements, one animation each.
+              */}
               <span
-                className="stagger-in block text-primary"
+                className="stagger-in block"
                 style={{ '--stagger': '220ms' } as CSSProperties}
               >
-                real?
+                <span className="text-gradient">real?</span>
               </span>
             </h1>
 
@@ -118,16 +148,18 @@ export default function LandingPage() {
               className="stagger-in mt-9 flex flex-wrap items-center gap-4"
               style={{ '--stagger': '460ms' } as CSSProperties}
             >
-              <Link
-                href="/dashboard"
-                className="sheen group inline-flex h-12 items-center gap-2 rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow-[var(--shadow-sm)] transition-all duration-200 hover:bg-primary/90 hover:shadow-[var(--shadow-md)]"
-              >
-                Search a product
-                <ArrowRight
-                  className="size-4 transition-transform duration-200 group-hover:translate-x-0.5"
-                  aria-hidden="true"
-                />
-              </Link>
+              <Magnetic>
+                <Link
+                  href="/dashboard"
+                  className="sheen group inline-flex h-12 items-center gap-2 rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow-[var(--shadow-sm)] transition-all duration-200 hover:bg-primary/90 hover:shadow-[var(--shadow-md)]"
+                >
+                  Search a product
+                  <ArrowRight
+                    className="size-4 transition-transform duration-200 group-hover:translate-x-0.5"
+                    aria-hidden="true"
+                  />
+                </Link>
+              </Magnetic>
 
               <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
                 <Link2 className="size-3.5" aria-hidden="true" />
@@ -136,10 +168,17 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* --- the same argument, as a picture -------------------------- */}
-          <div className="relative">
-            <HeroPriceCard />
-          </div>
+          {/* --- the same argument, as a picture --------------------------
+              Parallax and tilt together put this card nearest the viewer: it
+              leads the scroll slightly while the field behind it lags, and it
+              turns under the pointer. It is the only element on the page with
+              both, which is what makes it read as the focal object rather than
+              as one more animated thing. */}
+          <Parallax distance={26} className="relative">
+            <Tilt className="rounded-xl">
+              <HeroPriceCard />
+            </Tilt>
+          </Parallax>
         </div>
       </section>
 
@@ -194,16 +233,18 @@ export default function LandingPage() {
           <p className="mx-auto mt-3 max-w-md text-muted-foreground">
             Paste a product link and we start recording its price today.
           </p>
-          <Link
-            href="/dashboard"
-            className="sheen group mt-8 inline-flex h-12 items-center gap-2 rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow-[var(--shadow-sm)] transition-all duration-200 hover:bg-primary/90 hover:shadow-[var(--shadow-md)]"
-          >
-            Search a product
-            <ArrowRight
-              className="size-4 transition-transform duration-200 group-hover:translate-x-0.5"
-              aria-hidden="true"
-            />
-          </Link>
+          <Magnetic className="mt-8 inline-flex">
+            <Link
+              href="/dashboard"
+              className="sheen group inline-flex h-12 items-center gap-2 rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow-[var(--shadow-sm)] transition-all duration-200 hover:bg-primary/90 hover:shadow-[var(--shadow-md)]"
+            >
+              Search a product
+              <ArrowRight
+                className="size-4 transition-transform duration-200 group-hover:translate-x-0.5"
+                aria-hidden="true"
+              />
+            </Link>
+          </Magnetic>
         </div>
       </section>
     </>

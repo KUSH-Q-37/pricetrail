@@ -128,7 +128,15 @@ function PriceRow({
 export function HeroPriceCard() {
   return (
     <figure className="m-0 w-full">
-      <div className="rounded-xl border border-border bg-card p-5 shadow-[var(--shadow-md)]">
+      {/*
+        `border-sweep` is used on exactly one element in the whole product, and
+        this is it. A conic highlight travelling around a border is the most
+        attention-seeking effect in globals.css; a second one anywhere would
+        turn both into wallpaper. `edge-light` is the quieter half — a hairline
+        that brightens toward the top, which is what stops the card reading as
+        a flat rectangle on the dark themes.
+      */}
+      <div className="border-sweep edge-light rounded-xl border border-border bg-card p-5 shadow-[var(--shadow-md)]">
         {/* --- product ------------------------------------------------------ */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">

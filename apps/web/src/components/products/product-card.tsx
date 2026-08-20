@@ -52,7 +52,7 @@ export function ProductCard({ product }: { product: Product }) {
   const isPending = product.status === 'PENDING';
 
   return (
-    <Card className="flex flex-col p-4 transition-colors hover:border-primary/40">
+    <Card className="lift flex flex-col p-4">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <Link

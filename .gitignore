@@ -32,6 +32,11 @@ logs/
 # visual-check output from apps/web/scripts/screenshot-chart.mjs
 chart-*.png
 
+# visual-check output from apps/web/scripts/screenshot-themes.mjs. Regenerated
+# on demand against a running build; there is no reason to carry a fresh set of
+# theme/accent renders in the history.
+apps/web/screenshots/
+
 # test / coverage
 coverage/
 .nyc_output/

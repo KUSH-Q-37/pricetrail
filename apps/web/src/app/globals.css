@@ -1,38 +1,142 @@
 @import "tailwindcss";
 
 /* ===========================================================================
-   PriceTrail — one theme.
+   PriceTrail — themes, accents, motion.
    ===========================================================================
 
-   There is no dark mode, no toggle, and no `prefers-color-scheme` branch. That
-   is a product decision rather than an omission: two themes mean every
-   surface, border, shadow and chart step has to be designed and validated
-   twice, and the second one is invariably the one nobody checks. One surface,
-   chosen and validated, is the more finished answer.
+   THIS FILE REVERSES AN EARLIER DECISION, AND THE REASONING IS WORTH KEEPING.
 
-   Tokens are semantic, never raw colour. Components say `bg-card` and
-   `text-muted-foreground`, never `bg-white` or `bg-zinc-900`, so the palette
-   can be re-tuned in this file alone.
+   It used to say: one theme, no toggle, no `prefers-color-scheme` branch —
+   because two themes mean every surface, border, shadow and chart step has to
+   be designed and validated twice, and the second one is invariably the one
+   nobody checks.
 
-   oklch throughout: it is perceptually uniform, so a fixed lightness step
-   looks like the same step across hues, and mid-tones in gradients and hover
-   states stay clean rather than going muddy the way hex/hsl interpolation
-   does.
+   That risk was real and has not gone away. What changed is how it is
+   answered. Rather than one hand-tuned palette per theme (which is what makes
+   the second one rot), a theme here declares only a small set of SURFACE
+   values, and an accent declares only a hue and a chroma. Everything else —
+   primary, ring, hover beds, the ambient field — is DERIVED. There is no
+   second palette to forget to update, because there is no second palette.
+
+   Three themes ship: `light`, `dark`, `midnight`. Five accents. That is
+   fifteen combinations, which is precisely why none of them may be
+   hand-authored.
+
+   TOKENS ARE SEMANTIC, NEVER RAW COLOUR. Components say `bg-card` and
+   `text-muted-foreground`, never `bg-white` or `bg-zinc-900`.
+
+   oklch throughout: perceptually uniform, so a fixed lightness step looks like
+   the same step across hues — the property that makes deriving a palette from
+   a bare hue work at all.
 --------------------------------------------------------------------------- */
+
+/*
+ * Tailwind's `dark:` variant, taught about our attribute AND about the fact
+ * that "dark" is a CATEGORY rather than a theme name. `midnight` is a dark
+ * theme; anything written `dark:` must apply to it too, or every such utility
+ * would need writing twice and the second one would be the one that rots.
+ */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, [data-theme="midnight"], [data-theme="midnight"] *));
 
 :root {
   /* 14px. Large enough to read as considered, small enough that cards do not
      turn into pills. Everything else steps off this. */
   --radius: 0.875rem;
 
-  /* --- surfaces ----------------------------------------------------------
-     The page is a warm off-white and cards are pure white, so a card lifts off
-     the page without needing a shadow to do it. A pure-white page would force
-     every surface to be separated by a border instead. */
-  /* Deepened from 0.985 after looking at a render: at that value a white card
-     on this page was indistinguishable from the page, so every surface needed
-     its border to exist at all. This is still unmistakably light, but a card
-     now separates on its own. */
+  /* --- accent defaults ---------------------------------------------------
+     Indigo, matching what the product shipped with. These are ALSO repeated as
+     literal fallbacks inside every var() below. That is not belt-and-braces
+     fussiness: an undefined component makes the whole oklch() invalid at
+     computed-value time, so the colour silently resolves to `inherit` rather
+     than failing loudly — a genuinely confusing bug to meet for the first time
+     in production. */
+  --accent-h: 262;
+  --accent-c: 0.22;
+  --accent-l: 0.52;
+  --accent-l-dark: 0.7;
+  --accent-fg: oklch(0.99 0 0);
+  --accent-fg-dark: oklch(0.16 0.02 262);
+}
+
+/* ===========================================================================
+   ACCENTS — hue and chroma only.
+   ===========================================================================
+
+   An accent never names a surface and never names a chart colour. It supplies
+   a hue, a chroma, the lightness that hue needs in order to clear 4.5:1
+   against its own foreground, and that foreground.
+
+   The lightness is PER ACCENT rather than shared, because chroma is not free:
+   at equal L, amber is far brighter than indigo. A single shared L that gives
+   indigo 5.5:1 against white gives amber about 3.4:1 — a real contrast failure
+   that a shared constant would have shipped silently.
+--------------------------------------------------------------------------- */
+
+[data-accent="indigo"] {
+  --accent-h: 262;
+  --accent-c: 0.22;
+  --accent-l: 0.52; /* ~5.5:1 against white */
+  --accent-l-dark: 0.7; /* ~7.2:1 against its dark foreground */
+  --accent-fg: oklch(0.99 0 0);
+  --accent-fg-dark: oklch(0.16 0.02 262);
+}
+
+[data-accent="violet"] {
+  --accent-h: 300;
+  --accent-c: 0.23;
+  --accent-l: 0.52;
+  --accent-l-dark: 0.7;
+  --accent-fg: oklch(0.99 0 0);
+  --accent-fg-dark: oklch(0.16 0.02 300);
+}
+
+[data-accent="emerald"] {
+  --accent-h: 162;
+  --accent-c: 0.14;
+  --accent-l: 0.52;
+  --accent-l-dark: 0.72;
+  --accent-fg: oklch(0.99 0 0);
+  --accent-fg-dark: oklch(0.16 0.02 162);
+}
+
+/*
+ * Amber is the reason --accent-l exists at all. It has to sit far lighter than
+ * the others AND carry dark text: white on amber is unreadable at every
+ * lightness that still looks like amber.
+ */
+[data-accent="amber"] {
+  --accent-h: 70;
+  --accent-c: 0.16;
+  --accent-l: 0.72; /* ~7.0:1 against the dark foreground below */
+  --accent-l-dark: 0.8;
+  --accent-fg: oklch(0.22 0.04 70);
+  --accent-fg-dark: oklch(0.18 0.03 70);
+}
+
+[data-accent="rose"] {
+  --accent-h: 15;
+  --accent-c: 0.2;
+  --accent-l: 0.55; /* ~4.9:1 against white */
+  --accent-l-dark: 0.72;
+  --accent-fg: oklch(0.99 0 0);
+  --accent-fg-dark: oklch(0.16 0.02 15);
+}
+
+/* ===========================================================================
+   THEMES — surfaces only.
+   ===========================================================================
+   Each block declares surfaces, lines, elevation, status and chart marks. None
+   of them names the accent hue; that is derived further down from whichever
+   accent is active.
+--------------------------------------------------------------------------- */
+
+/* --- light ---------------------------------------------------------------
+   The page is a warm off-white and cards are pure white, so a card lifts off
+   the page without needing a shadow to do it. Deepened from 0.985 after
+   looking at a render: at that value a white card was indistinguishable from
+   the page, so every surface needed its border in order to exist at all. */
+:root,
+[data-theme="light"] {
   --background: oklch(0.968 0.007 85);
   --foreground: oklch(0.17 0.012 265);
 
@@ -42,28 +146,16 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.17 0.012 265);
 
-  /* --- interaction -------------------------------------------------------
-     One blue, for actions, links and focus. Deliberately not applied to
-     surfaces or headings: when everything is blue, nothing is. */
-  --primary: oklch(0.52 0.22 262);
-  --primary-foreground: oklch(0.99 0 0);
-
   --secondary: oklch(0.965 0.004 265);
   --secondary-foreground: oklch(0.28 0.02 265);
 
   --muted: oklch(0.968 0.004 265);
   --muted-foreground: oklch(0.52 0.02 265);
 
-  --accent: oklch(0.955 0.012 262);
-  --accent-foreground: oklch(0.3 0.04 262);
-
-  /* --- status ------------------------------------------------------------ */
   --destructive: oklch(0.55 0.2 25);
   --destructive-foreground: oklch(0.99 0 0);
-
   --success: oklch(0.55 0.14 155);
   --success-foreground: oklch(0.99 0 0);
-
   --warning: oklch(0.7 0.15 70);
   --warning-foreground: oklch(0.2 0.03 70);
 
@@ -74,7 +166,11 @@
      and a price rise share a colour, and re-tuning one would move the other.
 
      Never used alone: every price change ships with an arrow and a signed
-     number, so the meaning survives for a colourblind reader and in print. */
+     number, so the meaning survives for a colourblind reader and in print.
+
+     These deliberately do NOT follow the accent. A falling price is green
+     whatever colour someone has picked for their buttons; an accent that could
+     recolour it would let a user configure their way into a red price drop. */
   --price-down: oklch(0.52 0.14 155);
   --price-down-surface: oklch(0.96 0.03 155);
   --price-up: oklch(0.54 0.19 25);
@@ -86,20 +182,20 @@
      attention; anything heavier and a page of cards reads as a grid of boxes. */
   --border: oklch(0.925 0.005 265);
   --input: oklch(0.9 0.006 265);
-  --ring: oklch(0.52 0.22 262);
 
   /* --- elevation ---------------------------------------------------------
-     Three steps, all soft and tinted toward the text colour rather than pure
-     black, which is what stops a shadow reading as a grey smudge. */
+     Soft and tinted toward the text colour rather than pure black, which is
+     what stops a shadow reading as a grey smudge. */
   --shadow-xs: 0 1px 2px -1px oklch(0.17 0.012 265 / 0.06);
   --shadow-sm: 0 2px 8px -3px oklch(0.17 0.012 265 / 0.1);
   --shadow-md: 0 10px 30px -14px oklch(0.17 0.012 265 / 0.18);
+  --shadow-lg: 0 24px 60px -28px oklch(0.17 0.012 265 / 0.26);
 
   /* --- marketplace identity ---------------------------------------------
-     Fixed per platform. A reader must be able to tell the Amazon series from
-     the Flipkart one at a glance, so these never shift with context. They
-     always ship beside a text label — identity is never carried by colour
-     alone. */
+     Fixed per platform, never per accent. A reader must be able to tell the
+     Amazon series from the Flipkart one at a glance, so these never shift with
+     context. They always ship beside a text label — identity is never carried
+     by colour alone. */
   --amazon: oklch(0.72 0.15 65);
   --flipkart: oklch(0.55 0.19 258);
 
@@ -109,12 +205,181 @@
      Amazon chip sits at 2.31:1 against a white plot surface, below the 3:1
      mark-contrast floor.
 
-     These were produced by running the palette validator, not by eye, and
-     clear all six checks against this surface: lightness band, chroma floor,
-     CVD separation ΔE 29.9 (protan) / 27.2 (tritan), normal-vision ΔE 34.5,
-     and contrast. Re-run the validator before changing either value. */
+     Produced by running the palette validator, not by eye: lightness band,
+     chroma floor, CVD separation dE 29.9 (protan) / 27.2 (tritan), normal
+     vision dE 34.5, and contrast. Re-run it before changing either value. */
   --chart-amazon: #d1780f;
   --chart-flipkart: #2275e8;
+
+  /* --- ambient field -----------------------------------------------------
+     How hard the canvas behind the hero is allowed to push. A light surface
+     needs far less before the field stops reading as light and starts reading
+     as smog, so this is theme-owned rather than a constant in the component. */
+  --ambient-strength: 1;
+  --mesh-opacity: 0.5;
+}
+
+/* --- dark ----------------------------------------------------------------
+   Card is LIGHTER than the page, which matches light theme's logic rather than
+   inverting it: a card lifts toward the viewer in both, so "raised" means the
+   same thing whichever theme you are in. */
+[data-theme="dark"] {
+  --background: oklch(0.165 0.008 265);
+  --foreground: oklch(0.95 0.006 265);
+
+  --card: oklch(0.205 0.009 265);
+  --card-foreground: oklch(0.95 0.006 265);
+
+  --popover: oklch(0.215 0.01 265);
+  --popover-foreground: oklch(0.95 0.006 265);
+
+  --secondary: oklch(0.255 0.01 265);
+  --secondary-foreground: oklch(0.92 0.008 265);
+
+  --muted: oklch(0.25 0.01 265);
+  --muted-foreground: oklch(0.72 0.02 265); /* ~7.2:1 on the page */
+
+  --destructive: oklch(0.68 0.19 25);
+  --destructive-foreground: oklch(0.16 0.02 25);
+  --success: oklch(0.72 0.15 155);
+  --success-foreground: oklch(0.16 0.02 155);
+  --warning: oklch(0.79 0.15 70);
+  --warning-foreground: oklch(0.18 0.03 70);
+
+  /* Re-derived, not inverted. The light values sit at L 0.52 against a white
+     card; the identical colour on a near-black card is a smudge. */
+  --price-down: oklch(0.74 0.16 155);
+  --price-down-surface: oklch(0.28 0.05 155);
+  --price-up: oklch(0.71 0.18 25);
+  --price-up-surface: oklch(0.29 0.06 25);
+  --price-flat: oklch(0.66 0.015 265);
+
+  --border: oklch(0.285 0.011 265);
+  --input: oklch(0.33 0.013 265);
+
+  /* Shadows barely register on a dark surface, so elevation is carried mostly
+     by the card being lighter than the page. These stay for depth under
+     overlays, at much higher alpha and against pure black. */
+  --shadow-xs: 0 1px 2px -1px oklch(0 0 0 / 0.4);
+  --shadow-sm: 0 2px 10px -3px oklch(0 0 0 / 0.5);
+  --shadow-md: 0 12px 34px -14px oklch(0 0 0 / 0.62);
+  --shadow-lg: 0 28px 68px -28px oklch(0 0 0 / 0.7);
+
+  --amazon: oklch(0.79 0.14 65);
+  --flipkart: oklch(0.72 0.15 258);
+
+  /* Lifted to clear the same 3:1 mark-contrast floor against the dark plot
+     surface: ~8.3:1 and ~7.4:1 respectively against --card. Same two hues as
+     light, so the Amazon series is recognisably the Amazon series either way. */
+  --chart-amazon: #f2a03d;
+  --chart-flipkart: #5fa8ff;
+
+  --ambient-strength: 2.1;
+  --mesh-opacity: 0.85;
+}
+
+/* --- midnight ------------------------------------------------------------
+   Deeper, cooler and more saturated than `dark`. Not a second dark theme for
+   its own sake: `dark` is neutral and stays out of the way, midnight commits
+   to a hue and is the one the ambient field was tuned against. */
+[data-theme="midnight"] {
+  --background: oklch(0.135 0.022 275);
+  --foreground: oklch(0.94 0.012 275);
+
+  --card: oklch(0.178 0.026 275);
+  --card-foreground: oklch(0.94 0.012 275);
+
+  --popover: oklch(0.19 0.028 275);
+  --popover-foreground: oklch(0.94 0.012 275);
+
+  --secondary: oklch(0.235 0.03 275);
+  --secondary-foreground: oklch(0.91 0.015 275);
+
+  --muted: oklch(0.23 0.028 275);
+  --muted-foreground: oklch(0.71 0.03 275);
+
+  --destructive: oklch(0.68 0.19 25);
+  --destructive-foreground: oklch(0.15 0.02 25);
+  --success: oklch(0.72 0.15 155);
+  --success-foreground: oklch(0.15 0.02 155);
+  --warning: oklch(0.79 0.15 70);
+  --warning-foreground: oklch(0.17 0.03 70);
+
+  --price-down: oklch(0.75 0.17 155);
+  --price-down-surface: oklch(0.26 0.06 155);
+  --price-up: oklch(0.72 0.19 25);
+  --price-up-surface: oklch(0.27 0.07 25);
+  --price-flat: oklch(0.65 0.02 275);
+
+  --border: oklch(0.265 0.032 275);
+  --input: oklch(0.31 0.035 275);
+
+  --shadow-xs: 0 1px 2px -1px oklch(0 0 0 / 0.45);
+  --shadow-sm: 0 2px 10px -3px oklch(0 0 0 / 0.55);
+  --shadow-md: 0 12px 34px -14px oklch(0 0 0 / 0.68);
+  --shadow-lg: 0 28px 68px -28px oklch(0 0 0 / 0.75);
+
+  --amazon: oklch(0.8 0.14 65);
+  --flipkart: oklch(0.74 0.15 258);
+
+  --chart-amazon: #f5a742;
+  --chart-flipkart: #6cb2ff;
+
+  --ambient-strength: 2.6;
+  --mesh-opacity: 1;
+}
+
+/* ===========================================================================
+   DERIVED — accent x theme.
+   ===========================================================================
+
+   The whole point of the file. `--primary` is never authored; it is the active
+   accent's hue and chroma at the active theme's lightness. Adding a sixth
+   accent means adding four numbers, not three more palettes.
+
+   Ordered AFTER the theme blocks so it wins at equal specificity, and split
+   light/dark because a lightness that works on white does not work on black.
+--------------------------------------------------------------------------- */
+
+:root,
+[data-theme="light"] {
+  /* Published separately from --primary so anything that needs to build a
+     RELATED colour — a gradient stop a few degrees around the hue wheel, say —
+     can reach the resolved lightness and chroma without re-deriving which
+     theme it is in. Without these, such a colour has to guess between
+     --accent-l and --accent-l-dark and will be wrong in half the themes. */
+  --primary-l: var(--accent-l, 0.52);
+  --primary-c: var(--accent-c, 0.22);
+
+  --primary: oklch(var(--primary-l) var(--primary-c) var(--accent-h, 262));
+  --primary-foreground: var(--accent-fg, oklch(0.99 0 0));
+
+  /* A tint of the accent for hover beds and quiet fills. The chroma is cut
+     hard — at full strength this stops reading as a surface and starts reading
+     as a second brand colour. */
+  --accent: oklch(0.955 calc(var(--accent-c, 0.22) * 0.06) var(--accent-h, 262));
+  --accent-foreground: oklch(0.3 calc(var(--accent-c, 0.22) * 0.2) var(--accent-h, 262));
+}
+
+[data-theme="dark"],
+[data-theme="midnight"] {
+  --primary-l: var(--accent-l-dark, 0.7);
+  /* Chroma is pulled back on dark surfaces. A fully saturated accent that reads
+     as confident on white reads as neon against near-black. */
+  --primary-c: calc(var(--accent-c, 0.22) * 0.86);
+
+  --primary: oklch(var(--primary-l) var(--primary-c) var(--accent-h, 262));
+  --primary-foreground: var(--accent-fg-dark, oklch(0.16 0.02 262));
+
+  --accent: oklch(0.29 calc(var(--accent-c, 0.22) * 0.16) var(--accent-h, 262));
+  --accent-foreground: oklch(0.9 calc(var(--accent-c, 0.22) * 0.18) var(--accent-h, 262));
+}
+
+/* The focus ring is the primary in every theme and every accent. One rule, no
+   exceptions — a focus ring that changes meaning between themes is a focus
+   ring nobody learns to look for. */
+:root {
+  --ring: var(--primary);
 }
 
 /*
@@ -166,6 +431,42 @@
     border-color: var(--color-border);
   }
 
+  /*
+   * Colour transitions on a theme switch.
+   *
+   * Scoped to `[data-theme-ready]`, which the pre-hydration script sets only
+   * AFTER it has applied the stored theme. Without that guard the very first
+   * paint would animate from the default palette to the user's chosen one —
+   * a visible half-second wash on every page load, which is exactly the FOUC
+   * the script exists to prevent.
+   *
+   * Deliberately not `transition: all`: that would drag layout properties into
+   * the transition and make a theme switch re-animate every hover state.
+   */
+  [data-theme-ready] * {
+    transition:
+      background-color 0.28s ease,
+      border-color 0.28s ease,
+      color 0.28s ease,
+      fill 0.28s ease,
+      stroke 0.28s ease;
+  }
+
+  html {
+    /* The page background is painted behind overscroll too, so rubber-banding
+       on iOS does not reveal a white band under a dark theme. */
+    background-color: var(--color-background);
+    color-scheme: light;
+  }
+
+  /* Tells the browser to render native widgets — scrollbars, form controls,
+     spellcheck underlines — in dark. Without this a dark page gets light
+     scrollbars, which is the single most obvious tell of a bolted-on theme. */
+  [data-theme="dark"],
+  [data-theme="midnight"] {
+    color-scheme: dark;
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
@@ -214,222 +515,596 @@
   }
 }
 
+@property --sweep-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
 /* ===========================================================================
-   Motion and surface texture
+   Motion, texture and the expressive layer  —  @layer components
    ===========================================================================
 
-   CSS rather than a JS animation library. These run on the compositor, cost
-   nothing on the main thread, and — the reason it matters here — work inside
-   an SVG that stays a server component. Framer Motion in that chart would have
-   forced it client-side and pulled the hero visual out of the server-rendered
-   HTML a crawler receives.
+   THE LAYER IS LOAD-BEARING. DO NOT UNWRAP IT.
+
+   Everything in here is a custom class that Tailwind utilities must be able to
+   beat. Unlayered CSS wins against ANY layered rule, and Tailwind puts its
+   utilities in `@layer utilities` — so while these rules sat at the top level,
+   `.edge-light { position: relative }` silently overrode an `absolute` utility
+   on the same element. The appearance popover fell out of absolute positioning
+   into normal flow, blew the header height out to 311px, and dragged the whole
+   nav row off the top of the screen. Nothing errored; it just rendered wrong.
+
+   Sitting in `components` puts them BELOW utilities in the cascade, which is
+   the relationship a component class and a utility are supposed to have: the
+   class sets a sensible default, and a utility at the call site overrides it.
+
+   @keyframes and @property stay outside — they are not affected by the layer,
+   and a registered custom property should not depend on one.
 --------------------------------------------------------------------------- */
 
-/* Chart lines draw themselves in. dasharray is the path length, so the dash is
-   the whole line and the offset walks it into view. */
-@keyframes draw-line {
-  from { stroke-dashoffset: var(--dash); }
-  to   { stroke-dashoffset: 0; }
+@layer components {
+  /* ===========================================================================
+     Motion and surface texture
+     ===========================================================================
+
+     CSS wherever CSS can do it. These run on the compositor, cost nothing on the
+     main thread, and — the reason it matters here — work inside an SVG that
+     stays a server component. Framer Motion in the hero chart would have forced
+     it client-side and pulled the hero visual out of the server-rendered HTML a
+     crawler receives.
+
+     Everything below has a `prefers-reduced-motion` answer at the foot of the
+     file. That is not politeness: the OS setting is a medical accommodation.
+  --------------------------------------------------------------------------- */
+
+  /* Chart lines draw themselves in. dasharray is the path length, so the dash is
+     the whole line and the offset walks it into view. */
+  @keyframes draw-line {
+    from {
+      stroke-dashoffset: var(--dash);
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  .chart-line {
+    stroke-dasharray: var(--dash);
+    stroke-dashoffset: var(--dash);
+    animation: draw-line 1.4s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+  }
+
+  /*
+   * Ambient wash behind the hero.
+   *
+   * Now accent-following: the hue comes from --accent-h, so switching accent
+   * re-lights the page rather than leaving a blue glow behind a rose button. The
+   * second stop stays on the Amazon hue as a fixed warm counterpoint, so the
+   * wash never collapses into a single flat tint whatever the accent.
+   *
+   * Chroma stays very low. This is meant to read as light falling on a surface,
+   * not as a graphic applied to the page.
+   */
+  .ambient {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        60% 50% at 50% 0%,
+        oklch(var(--accent-l, 0.52) var(--accent-c, 0.22) var(--accent-h, 262) /
+            calc(0.05 * var(--ambient-strength, 1))),
+        transparent 70%
+      ),
+      radial-gradient(
+        40% 40% at 85% 10%,
+        oklch(0.72 0.15 65 / calc(0.035 * var(--ambient-strength, 1))),
+        transparent 70%
+      );
+  }
+
+  /*
+   * Faint grid — a nod to plotted data rather than an illustration of it.
+   * Masked so it fades out well before it reaches any text.
+   */
+  .grid-texture {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(
+        to right,
+        color-mix(in oklab, var(--foreground) 3%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        color-mix(in oklab, var(--foreground) 3%, transparent) 1px,
+        transparent 1px
+      );
+    background-size: 56px 56px;
+    mask-image: radial-gradient(70% 60% at 50% 0%, black, transparent 75%);
+  }
+
+  /* Soft pulse on the "tracking daily" dot — a heartbeat implying live data. */
+  @keyframes live-pulse {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.45;
+      transform: scale(0.82);
+    }
+  }
+
+  .live-dot {
+    animation: live-pulse 2.4s ease-in-out infinite;
+  }
+
+  /*
+   * Card hover. 2px, because 2px reads as responsive and 8px reads as a toy.
+   * The border warming toward the primary does more work than the movement.
+   */
+  .lift {
+    transition:
+      transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 0.2s ease;
+  }
+
+  .lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: color-mix(in oklab, var(--primary) 22%, var(--border));
+  }
+
+  /* Entrance for content that arrives after a fetch, so a chart or card resolves
+     rather than snapping in. */
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .rise-in {
+    animation: rise-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /*
+   * Staggered entrance for a headline read line by line.
+   *
+   * The delay is set per element via --stagger rather than by nth-child, because
+   * the order that matters is the READING order, not the DOM order, and those
+   * come apart the moment a layout wraps differently on mobile.
+   */
+  @keyframes stagger-in {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .stagger-in {
+    opacity: 0;
+    animation: stagger-in 0.62s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    animation-delay: var(--stagger, 0ms);
+  }
+
+  /*
+   * Aurora drift behind the hero.
+   *
+   * This reverses an earlier decision too, and the earlier reasoning still
+   * stands as far as it went: a background that MOVES competes with the content
+   * it exists to sit behind. What was wrong was treating "moves" as one thing.
+   * At 28 seconds per cycle nothing on screen is ever perceptibly travelling —
+   * the wash is simply not quite where it was a minute ago, which reads as
+   * daylight shifting rather than as an animation playing.
+   *
+   * The chroma stays where it was. Slow is what makes this safe; bright would
+   * undo it however slow it went.
+   */
+  @keyframes aurora-drift {
+    0% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    50% {
+      transform: translate3d(-2.5%, 1.5%, 0) scale(1.06);
+    }
+    100% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+  }
+
+  .ambient--drift {
+    animation: aurora-drift 28s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  /*
+   * Light passing across the primary action on hover.
+   *
+   * A 700ms sweep, once per hover, at 16% white. Long enough to register as a
+   * material catching the light and too faint to compete with the label — a
+   * button whose shine you can read the time by is a button nobody reads.
+   */
+  .sheen {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .sheen::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-120%);
+    background: linear-gradient(
+      100deg,
+      transparent 20%,
+      rgb(255 255 255 / 0.16) 50%,
+      transparent 80%
+    );
+    pointer-events: none;
+  }
+
+  .sheen:hover::after {
+    animation: sheen-sweep 0.7s cubic-bezier(0.33, 1, 0.68, 1);
+  }
+
+  @keyframes sheen-sweep {
+    to {
+      transform: translateX(120%);
+    }
+  }
+
+  /*
+   * The number a price counts toward, and the only thing on the page allowed to
+   * animate its VALUE rather than its position.
+   *
+   * Reserved for a price because a number that ticks upward reads as a number
+   * being computed. On a price that is a lie — it was observed, not derived — so
+   * the count is fast (0.9s) and lands on the real figure rather than lingering.
+   * Anything slower turns a fact into a slot machine.
+   */
+  .count-up {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ===========================================================================
+     Expressive layer
+     ===========================================================================
+     Added with the bolder motion pass. Everything here is decoration over a
+     layout that already works without it — nothing below moves anything into or
+     out of the document, so a failed animation is invisible rather than broken.
+  --------------------------------------------------------------------------- */
+
+  /*
+   * Gradient text, clipped to the glyphs.
+   *
+   * Kept to ONE phrase per page. A gradient headline is a strong effect and
+   * loses all of it the moment a second one appears; it also costs contrast, so
+   * it is never applied to anything a reader has to work through — only to a
+   * word or two they already know the shape of.
+   *
+   * The fallback colour is set first, so a browser without background-clip:text
+   * gets solid primary rather than invisible text.
+   *
+   * DO NOT PUT THIS ON THE SAME ELEMENT AS `.stagger-in` OR `.reveal-native`.
+   * Both of those use the `animation` SHORTHAND, and so does this — whichever
+   * rule loses the cascade has its animation silently dropped, not merged. That
+   * is a cosmetic failure here but a total one there, because `.stagger-in`
+   * starts at `opacity: 0` and relies on its animation to become visible: the
+   * text vanishes completely. Wrap instead of combining. This has already been
+   * shipped and caught once.
+   *
+   * The mid-stop reads --primary-l/--primary-c so it tracks the ACTIVE theme's
+   * lightness. Built from --accent-l directly it would use the light-theme value
+   * on every dark theme and come out as a muddy band across the word.
+   */
+  .text-gradient {
+    color: var(--primary);
+    background: linear-gradient(
+      100deg,
+      var(--primary) 0%,
+      oklch(var(--primary-l) var(--primary-c) calc(var(--accent-h, 262) - 42)) 55%,
+      var(--primary) 100%
+    );
+    background-size: 220% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradient-pan 9s ease-in-out infinite;
+  }
+
+  @keyframes gradient-pan {
+    0%,
+    100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+
+  /*
+   * A hairline that brightens toward the light source at the top of a card.
+   * This is what makes a surface read as MATERIAL rather than as a rectangle,
+   * and it is the single cheapest way to stop a dark theme looking flat.
+   */
+  .edge-light {
+    position: relative;
+  }
+
+  .edge-light::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      160deg,
+      color-mix(in oklab, var(--foreground) 12%, transparent),
+      transparent 42%
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /*
+   * Glass surface for anything floating over the ambient canvas.
+   * The saturate() is what stops a blurred translucent panel going grey over a
+   * coloured field — blur alone desaturates whatever is behind it.
+   */
+  .glass {
+    /* 88%, not the 72% this started at. At 72% the hero card behind the
+       appearance popover read straight through it — two sets of words in the
+       same place, and the panel's own labels lost. Glass has to stay a surface
+       first and an effect second. */
+    background: color-mix(in oklab, var(--card) 88%, transparent);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+  }
+
+  /*
+   * Conic sweep around a border. Used on exactly one element — the hero card —
+   * because it is the most attention-seeking effect in the file.
+   *
+   * The animation drives a registered custom property rather than a
+   * `background-image`, which is what lets it run on the compositor instead of
+   * repainting a gradient every frame. Browsers without @property ignore the
+   * @property rule and the angle simply never animates: a static border, not a
+   * broken one.
+   */
+  .border-sweep {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .border-sweep::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    z-index: -1;
+    background: conic-gradient(
+      from var(--sweep-angle),
+      transparent 0deg,
+      color-mix(in oklab, var(--primary) 55%, transparent) 40deg,
+      transparent 110deg,
+      transparent 360deg
+    );
+    animation: sweep-rotate 6s linear infinite;
+    opacity: 0.75;
+  }
+
+  @keyframes sweep-rotate {
+    to {
+      --sweep-angle: 360deg;
+    }
+  }
+
+  /*
+   * Shimmer for skeletons. A skeleton that does not move is indistinguishable
+   * from a layout that has failed to load.
+   */
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklab, var(--foreground) 7%, transparent),
+      transparent
+    );
+    animation: shimmer-sweep 1.6s ease-in-out infinite;
+  }
+
+  @keyframes shimmer-sweep {
+    to {
+      transform: translateX(100%);
+    }
+  }
+
+  /*
+   * Scroll-linked progress bar, driven by the native scroll timeline where the
+   * browser has one. No JS, no scroll listener, no layout thrash.
+   *
+   * `animation-timeline` is progressively enhanced: without support the element
+   * simply sits at scaleX(0) and is invisible, which is why the bar is purely
+   * decorative and duplicates no information.
+   */
+  .scroll-progress {
+    transform-origin: 0 50%;
+    transform: scaleX(0);
+  }
+
+  @supports (animation-timeline: scroll()) {
+    .scroll-progress {
+      animation: scroll-grow linear;
+      animation-timeline: scroll(root block);
+    }
+  }
+
+  @keyframes scroll-grow {
+    to {
+      transform: scaleX(1);
+    }
+  }
+
+  /*
+   * Scroll-driven reveal, native where available.
+   *
+   * This does the same job as the Framer Motion <Reveal> wrapper but without
+   * shipping a client component, so it is preferred for anything that would
+   * otherwise have to leave the server. Reveal survives for the cases that need
+   * to coordinate with React state.
+   */
+  @supports (animation-timeline: view()) {
+    .reveal-native {
+      animation: rise-in-far linear both;
+      animation-timeline: view();
+      animation-range: entry 10% cover 32%;
+    }
+  }
+
+  @keyframes rise-in-far {
+    from {
+      opacity: 0;
+      transform: translateY(28px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /*
+   * Accent swatches in the picker.
+   *
+   * These read --accent-* DIRECTLY rather than --primary, and that is the whole
+   * trick. Custom properties inherit their COMPUTED value, so a swatch carrying
+   * `data-accent="rose"` would still inherit the root's already-substituted
+   * --primary and come out indigo. Referencing the raw hue/chroma/lightness
+   * instead makes the substitution happen at the swatch, where the rose values
+   * are in scope.
+   *
+   * The payoff is that the five hues exist only in this file. The picker names
+   * accents; it never knows what colour they are.
+   */
+  .accent-swatch {
+    background: oklch(var(--accent-l, 0.52) var(--accent-c, 0.22) var(--accent-h, 262));
+  }
+
+  [data-theme="dark"] .accent-swatch,
+  [data-theme="midnight"] .accent-swatch {
+    background: oklch(
+      var(--accent-l-dark, 0.7) calc(var(--accent-c, 0.22) * 0.86) var(--accent-h, 262)
+    );
+  }
+
+  /*
+   * The canvas behind the hero.
+   *
+   * Strength is theme-owned rather than fixed in the component: the same field
+   * that reads as depth on midnight reads as dirt on a warm off-white, so light
+   * takes roughly half of it.
+   *
+   * The mask is the part that makes it usable at all. Unmasked, links and dots
+   * run straight under the headline and every glyph acquires a faint texture;
+   * fading the field out before it reaches the text means the effect is visible
+   * exactly where there is nothing to read.
+   */
+  .ambient-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    opacity: var(--mesh-opacity, 0.5);
+    mask-image:
+      radial-gradient(75% 65% at 50% 40%, black 25%, transparent 78%),
+      linear-gradient(to bottom, black 60%, transparent 96%);
+    mask-composite: intersect;
+    -webkit-mask-image:
+      radial-gradient(75% 65% at 50% 40%, black 25%, transparent 78%),
+      linear-gradient(to bottom, black 60%, transparent 96%);
+    -webkit-mask-composite: source-in;
+  }
+
 }
 
-.chart-line {
-  stroke-dasharray: var(--dash);
-  stroke-dashoffset: var(--dash);
-  animation: draw-line 1.4s cubic-bezier(0.33, 1, 0.68, 1) forwards;
-}
+/* ===========================================================================
+   One switch disables the lot.
+   ===========================================================================
+   Required rather than polite: the OS setting is a medical accommodation, and
+   vestibular disorders make large or continuous motion genuinely unpleasant.
 
-/*
- * Ambient wash behind the hero.
- *
- * This replaces two saturated blurred blobs, which read as decoration applied
- * to the page rather than as part of it. What is left is a single very low
- * chroma lift toward the top of the section — closer to light falling on a
- * surface than to a graphic. It does not animate: a background that moves
- * competes with the content it exists to sit behind.
- */
-.ambient {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(60% 50% at 50% 0%, oklch(0.52 0.22 262 / 0.05), transparent 70%),
-    radial-gradient(40% 40% at 85% 10%, oklch(0.72 0.15 65 / 0.035), transparent 70%);
-}
-
-/*
- * Faint grid — a nod to plotted data rather than an illustration of it.
- * Masked so it fades out well before it reaches any text.
- */
-.grid-texture {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(to right, oklch(0.17 0.012 265 / 0.028) 1px, transparent 1px),
-    linear-gradient(to bottom, oklch(0.17 0.012 265 / 0.028) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: radial-gradient(70% 60% at 50% 0%, black, transparent 75%);
-}
-
-/* Soft pulse on the "tracking daily" dot — a heartbeat implying live data. */
-@keyframes live-pulse {
-  0%, 100% { opacity: 1;    transform: scale(1); }
-  50%      { opacity: 0.45; transform: scale(0.82); }
-}
-
-.live-dot { animation: live-pulse 2.4s ease-in-out infinite; }
-
-/*
- * Card hover. 2px, because 2px reads as responsive and 8px reads as a toy.
- * The border warming toward the primary does more work than the movement.
- */
-.lift {
-  transition:
-    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 0.2s ease;
-}
-
-.lift:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-  border-color: color-mix(in oklab, var(--primary) 22%, var(--border));
-}
-
-/* Entrance for content that arrives after a fetch, so a chart or card resolves
-   rather than snapping in. */
-@keyframes rise-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.rise-in {
-  animation: rise-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-/* One switch disables the lot. Required rather than polite: the OS setting is
-   a medical accommodation. */
+   Note what is NOT disabled — opacity-only entrances still run, because the
+   thing that causes trouble is travel, not appearance. Content still arrives;
+   it just stops moving to get there.
+--------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   .chart-line {
     animation: none;
     stroke-dashoffset: 0;
   }
+
   .live-dot,
-  .rise-in {
+  .rise-in,
+  .ambient--drift,
+  .text-gradient,
+  .border-sweep::before,
+  .shimmer::after,
+  .scroll-progress,
+  .reveal-native {
     animation: none;
   }
-  .lift:hover {
-    transform: none;
-  }
-}
 
-/* ===========================================================================
-   Added motion pass
-   ===========================================================================
-
-   Everything here is CSS, deliberately. The landing page is a server
-   component, and reaching for Framer Motion to animate its headline would make
-   the whole subtree client-only — trading the text a crawler receives for a
-   flourish. CSS animations run on the compositor and cost nothing on the main
-   thread, so the page stays server-rendered AND moves.
---------------------------------------------------------------------------- */
-
-/*
- * Staggered entrance for a headline read line by line.
- *
- * The delay is set per element via --stagger rather than by nth-child, because
- * the order that matters is the reading order, not the DOM order, and those
- * come apart the moment a layout wraps differently on mobile.
- */
-@keyframes stagger-in {
-  from { opacity: 0; transform: translateY(14px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.stagger-in {
-  opacity: 0;
-  animation: stagger-in 0.62s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  animation-delay: var(--stagger, 0ms);
-}
-
-/*
- * Aurora drift behind the hero.
- *
- * This reverses an earlier decision, and the earlier reasoning still stands as
- * far as it went: a background that MOVES competes with the content it exists
- * to sit behind. What was wrong was treating "moves" as one thing. At 28
- * seconds per cycle nothing on screen is ever perceptibly travelling — the
- * wash is simply not quite where it was a minute ago, which reads as daylight
- * shifting rather than as an animation playing.
- *
- * The chroma stays where it was. Slow is what makes this safe; bright would
- * undo it however slow it went.
- */
-@keyframes aurora-drift {
-  0%   { transform: translate3d(0, 0, 0) scale(1); }
-  50%  { transform: translate3d(-2.5%, 1.5%, 0) scale(1.06); }
-  100% { transform: translate3d(0, 0, 0) scale(1); }
-}
-
-.ambient--drift {
-  animation: aurora-drift 28s ease-in-out infinite;
-  will-change: transform;
-}
-
-/*
- * Light passing across the primary action on hover.
- *
- * A 700ms sweep, once per hover, at 12% white. Long enough to register as a
- * material catching the light and too faint to compete with the label — a
- * button whose shine you can read the time by is a button nobody reads.
- */
-.sheen { position: relative; overflow: hidden; }
-
-.sheen::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  transform: translateX(-120%);
-  background: linear-gradient(
-    100deg,
-    transparent 20%,
-    rgb(255 255 255 / 0.16) 50%,
-    transparent 80%
-  );
-  pointer-events: none;
-}
-
-.sheen:hover::after {
-  animation: sheen-sweep 0.7s cubic-bezier(0.33, 1, 0.68, 1);
-}
-
-@keyframes sheen-sweep {
-  to { transform: translateX(120%); }
-}
-
-/*
- * The number a price counts toward, and the only thing on the page allowed to
- * animate its VALUE rather than its position.
- *
- * Reserved for a price because a number that ticks upward reads as a number
- * being computed. On a price that is a lie — it was observed, not derived —
- * so the count is fast (0.9s) and lands on the real figure rather than
- * lingering. Anything slower turns a fact into a slot machine.
- */
-.count-up {
-  font-variant-numeric: tabular-nums;
-}
-
-/* One switch disables the additions too. */
-@media (prefers-reduced-motion: reduce) {
   .stagger-in {
     animation: none;
     opacity: 1;
   }
-  .ambient--drift {
-    animation: none;
-  }
+
   .sheen:hover::after {
     animation: none;
+  }
+
+  .lift:hover {
+    transform: none;
+  }
+
+  /* The gradient headline still needs a visible colour once its animation is
+     gone — background-clip with a static gradient is fine, it just does not
+     pan. Falling all the way back to a flat primary keeps it legible. */
+  .text-gradient {
+    background: none;
+    -webkit-text-fill-color: var(--primary);
+  }
+
+  /* A theme switch should still be instant rather than crossfaded. */
+  [data-theme-ready] * {
+    transition: none;
   }
 }

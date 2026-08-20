@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 
 import { ApiStatusPill } from '@/components/layout/api-status-pill';
+import { ThemePicker } from '@/components/theme/theme-picker';
 import { ApiError } from '@/lib/api-client';
 import { useIngestProduct } from '@/hooks/use-products';
 import { useUiStore } from '@/stores/ui-store';
@@ -108,6 +109,7 @@ export function Header() {
 
       <div className="ml-auto flex items-center gap-2">
         <ApiStatusPill />
+        <ThemePicker />
       </div>
     </header>
   );
