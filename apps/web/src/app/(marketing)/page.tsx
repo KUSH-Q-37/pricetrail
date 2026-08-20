@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight, CalendarClock, LineChart, Link2, ShieldCheck } from 'lucide-react';
@@ -70,36 +71,56 @@ export default function LandingPage() {
         scroll.
       */}
       <section className="relative overflow-hidden px-4 pb-20 pt-16 sm:pt-24">
-        <div className="ambient" aria-hidden="true" />
+        <div className="ambient ambient--drift" aria-hidden="true" />
         <div className="grid-texture" aria-hidden="true" />
 
         <div className="relative mx-auto grid w-full max-w-7xl items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,520px)] lg:gap-16">
           {/* --- the argument -------------------------------------------- */}
           <div>
-            <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-border bg-card/70 px-3 py-1 text-xs text-muted-foreground backdrop-blur-sm">
+            <p
+              className="stagger-in mb-5 inline-flex items-center gap-2 rounded-full border border-border bg-card/70 px-3 py-1 text-xs text-muted-foreground backdrop-blur-sm"
+              style={{ '--stagger': '0ms' } as CSSProperties}
+            >
               <span className="live-dot size-1.5 rounded-full bg-success" aria-hidden="true" />
               Tracking Amazon.in &amp; Flipkart daily
             </p>
 
+            {/* Two lines, staggered in reading order. The question lands, then
+                the word that sharpens it. */}
             <h1 className="text-[2.75rem] font-semibold leading-[1.03] tracking-[-0.03em] sm:text-6xl">
-              Is that discount
-              <br />
-              <span className="text-primary">real?</span>
+              <span
+                className="stagger-in block"
+                style={{ '--stagger': '90ms' } as CSSProperties}
+              >
+                Is that discount
+              </span>
+              <span
+                className="stagger-in block text-primary"
+                style={{ '--stagger': '220ms' } as CSSProperties}
+              >
+                real?
+              </span>
             </h1>
 
             {/* Capped near 62 characters per line. Longer measures are where a
                 reader loses their place returning to the next line. */}
-            <p className="mt-6 max-w-[34rem] text-lg leading-relaxed text-muted-foreground">
+            <p
+              className="stagger-in mt-6 max-w-[34rem] text-lg leading-relaxed text-muted-foreground"
+              style={{ '--stagger': '340ms' } as CSSProperties}
+            >
               A product showing &ldquo;40% off&rdquo; means nothing on its own — the
               sticker price may have been raised last week. PriceTrail records what
               things <em className="not-italic text-foreground">actually</em> cost,
               every day, so you can tell a genuine drop from a marketing number.
             </p>
 
-            <div className="mt-9 flex flex-wrap items-center gap-4">
+            <div
+              className="stagger-in mt-9 flex flex-wrap items-center gap-4"
+              style={{ '--stagger': '460ms' } as CSSProperties}
+            >
               <Link
                 href="/dashboard"
-                className="group inline-flex h-12 items-center gap-2 rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow-[var(--shadow-sm)] transition-all duration-200 hover:bg-primary/90 hover:shadow-[var(--shadow-md)]"
+                className="sheen group inline-flex h-12 items-center gap-2 rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow-[var(--shadow-sm)] transition-all duration-200 hover:bg-primary/90 hover:shadow-[var(--shadow-md)]"
               >
                 Search a product
                 <ArrowRight
@@ -175,7 +196,7 @@ export default function LandingPage() {
           </p>
           <Link
             href="/dashboard"
-            className="group mt-8 inline-flex h-12 items-center gap-2 rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow-[var(--shadow-sm)] transition-all duration-200 hover:bg-primary/90 hover:shadow-[var(--shadow-md)]"
+            className="sheen group mt-8 inline-flex h-12 items-center gap-2 rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow-[var(--shadow-sm)] transition-all duration-200 hover:bg-primary/90 hover:shadow-[var(--shadow-md)]"
           >
             Search a product
             <ArrowRight

@@ -62,7 +62,14 @@ export function PriceHistoryChart({
       // The palette was validated against the CARD surface, so the plot must
       // actually sit on it.
       backgroundColor: 'transparent',
-      animationDuration: 400,
+      // 700ms with the series offset, rather than 400 with both at once.
+      //
+      // Amazon and Flipkart drawing simultaneously reads as one thing arriving;
+      // offset, it reads as two, which is what the chart is for. The offset is
+      // per SERIES, not per point — a stagger across hundreds of points would
+      // draw attention to the animation instead of the comparison.
+      animationDuration: 700,
+      animationDelay: (index: number) => index * 140,
       animationEasing: 'cubicOut' as const,
 
       // Room for the x-axis band. A fixed height that excludes it produces a

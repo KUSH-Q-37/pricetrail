@@ -105,7 +105,7 @@ export function DashboardSearch() {
         <button
           type="submit"
           disabled={!url.trim() || ingest.isPending}
-          className="group inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow-[var(--shadow-xs)] transition-all duration-200 hover:bg-primary/90 hover:shadow-[var(--shadow-sm)] disabled:pointer-events-none disabled:opacity-50"
+          className="sheen group inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow-[var(--shadow-xs)] transition-all duration-200 hover:bg-primary/90 hover:shadow-[var(--shadow-sm)] disabled:pointer-events-none disabled:opacity-50"
         >
           {ingest.isPending ? (
             <>

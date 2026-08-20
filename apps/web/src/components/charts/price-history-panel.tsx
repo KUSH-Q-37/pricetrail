@@ -5,6 +5,7 @@ import { AlertTriangle, CalendarClock, LineChart as LineChartIcon } from 'lucide
 import { PriceHistoryChart } from './price-history-chart';
 import { PLATFORM_LABEL } from './chart-theme';
 import { Badge } from '@/components/ui/badge';
+import { CountUp } from '@/components/ui/count-up';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
@@ -142,9 +143,14 @@ export function PriceHistoryPanel({ productId }: { productId: string }) {
                       </span>
                     </div>
                     <p className="mt-0.5 text-xl font-semibold tabular-price">
-                      {entry.stats.latest !== null
-                        ? formatPrice(entry.stats.latest, entry.currency)
-                        : '—'}
+                      {entry.stats.latest !== null ? (
+                        <CountUp
+                          valueMinor={entry.stats.latest}
+                          currency={entry.currency}
+                        />
+                      ) : (
+                        '—'
+                      )}
                     </p>
                     {entry.stats.changePercent !== null ? (
                       // Price movement, not system status — hence the

@@ -322,3 +322,114 @@
     transform: none;
   }
 }
+
+/* ===========================================================================
+   Added motion pass
+   ===========================================================================
+
+   Everything here is CSS, deliberately. The landing page is a server
+   component, and reaching for Framer Motion to animate its headline would make
+   the whole subtree client-only — trading the text a crawler receives for a
+   flourish. CSS animations run on the compositor and cost nothing on the main
+   thread, so the page stays server-rendered AND moves.
+--------------------------------------------------------------------------- */
+
+/*
+ * Staggered entrance for a headline read line by line.
+ *
+ * The delay is set per element via --stagger rather than by nth-child, because
+ * the order that matters is the reading order, not the DOM order, and those
+ * come apart the moment a layout wraps differently on mobile.
+ */
+@keyframes stagger-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.stagger-in {
+  opacity: 0;
+  animation: stagger-in 0.62s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: var(--stagger, 0ms);
+}
+
+/*
+ * Aurora drift behind the hero.
+ *
+ * This reverses an earlier decision, and the earlier reasoning still stands as
+ * far as it went: a background that MOVES competes with the content it exists
+ * to sit behind. What was wrong was treating "moves" as one thing. At 28
+ * seconds per cycle nothing on screen is ever perceptibly travelling — the
+ * wash is simply not quite where it was a minute ago, which reads as daylight
+ * shifting rather than as an animation playing.
+ *
+ * The chroma stays where it was. Slow is what makes this safe; bright would
+ * undo it however slow it went.
+ */
+@keyframes aurora-drift {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(-2.5%, 1.5%, 0) scale(1.06); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+
+.ambient--drift {
+  animation: aurora-drift 28s ease-in-out infinite;
+  will-change: transform;
+}
+
+/*
+ * Light passing across the primary action on hover.
+ *
+ * A 700ms sweep, once per hover, at 12% white. Long enough to register as a
+ * material catching the light and too faint to compete with the label — a
+ * button whose shine you can read the time by is a button nobody reads.
+ */
+.sheen { position: relative; overflow: hidden; }
+
+.sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-120%);
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgb(255 255 255 / 0.16) 50%,
+    transparent 80%
+  );
+  pointer-events: none;
+}
+
+.sheen:hover::after {
+  animation: sheen-sweep 0.7s cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+@keyframes sheen-sweep {
+  to { transform: translateX(120%); }
+}
+
+/*
+ * The number a price counts toward, and the only thing on the page allowed to
+ * animate its VALUE rather than its position.
+ *
+ * Reserved for a price because a number that ticks upward reads as a number
+ * being computed. On a price that is a lie — it was observed, not derived —
+ * so the count is fast (0.9s) and lands on the real figure rather than
+ * lingering. Anything slower turns a fact into a slot machine.
+ */
+.count-up {
+  font-variant-numeric: tabular-nums;
+}
+
+/* One switch disables the additions too. */
+@media (prefers-reduced-motion: reduce) {
+  .stagger-in {
+    animation: none;
+    opacity: 1;
+  }
+  .ambient--drift {
+    animation: none;
+  }
+  .sheen:hover::after {
+    animation: none;
+  }
+}
