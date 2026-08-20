@@ -142,6 +142,17 @@ services:
       - key: AMAZON_CREATORS_VERSION
         sync: false
 
+      # --- catalogue discovery ------------------------------------------------
+      # Enrols products nobody searched, so the catalogue grows on its own.
+      # MAX_LISTINGS is a storage budget: each tracked product eventually costs
+      # ~137 KB of price history across the 15-month window, so 2500 is roughly
+      # 350 MB of a 500 MB free tier. Exceeding it fills the disk and stops the
+      # sweep recording ANY price.
+      - key: DISCOVERY_ENABLED
+        value: 'true'
+      - key: DISCOVERY_MAX_LISTINGS
+        value: '2500'
+
   # ---------------------------------------------------------------------------
   - type: worker
     name: pricetrail-worker
@@ -194,3 +205,14 @@ services:
         sync: false
       - key: AMAZON_CREATORS_VERSION
         sync: false
+
+      # --- catalogue discovery ------------------------------------------------
+      # Enrols products nobody searched, so the catalogue grows on its own.
+      # MAX_LISTINGS is a storage budget: each tracked product eventually costs
+      # ~137 KB of price history across the 15-month window, so 2500 is roughly
+      # 350 MB of a 500 MB free tier. Exceeding it fills the disk and stops the
+      # sweep recording ANY price.
+      - key: DISCOVERY_ENABLED
+        value: 'true'
+      - key: DISCOVERY_MAX_LISTINGS
+        value: '2500'

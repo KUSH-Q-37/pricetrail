@@ -46,9 +46,29 @@ async function bootstrap(): Promise<void> {
   // Rate limiting keys anonymous callers by IP. Behind a load balancer every
   // request carries the balancer's address unless Express is told to trust the
   // proxy and read X-Forwarded-For. Without this, one bucket throttles
-  // everyone. `1` = trust exactly one hop; never `true`, which lets a client
-  // forge the header and evade limiting entirely.
-  app.set('trust proxy', 1);
+  // everyone.
+  //
+  // The number is how many hops closest to us to trust, and it must match the
+  // deployment exactly. Too low and every caller shares one bucket, so a
+  // single busy visitor throttles the site. Too high and a client can prepend
+  // its own X-Forwarded-For and evade limiting entirely — which is why this is
+  // never `true`, whatever the hop count turns out to be.
+  //
+  // Configurable because it is a property of the environment, not the code:
+  // one hop is right for a single load balancer, two once a CDN sits in front.
+  // To check on a live deployment, call a rate-limited endpoint repeatedly
+  // from two different networks — if they exhaust one shared budget, this is
+  // too low.
+  const trustProxyHops = Number(process.env['TRUST_PROXY_HOPS'] ?? 1);
+  if (!Number.isInteger(trustProxyHops) || trustProxyHops < 0) {
+    // Fail loudly rather than silently falling back. A typo here degrades rate
+    // limiting in a way nothing else surfaces — the API keeps working, and the
+    // only symptom is legitimate users being throttled as one.
+    throw new Error(
+      `TRUST_PROXY_HOPS must be a non-negative integer, got "${process.env['TRUST_PROXY_HOPS']}"`,
+    );
+  }
+  app.set('trust proxy', trustProxyHops);
 
   app.enableCors({
     origin: config.corsOrigins.length > 0 ? config.corsOrigins : false,
