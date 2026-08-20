@@ -15,6 +15,8 @@ export const ErrorCode = {
   QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
   RATE_LIMITED: 'RATE_LIMITED',
   UNSUPPORTED_MARKETPLACE: 'UNSUPPORTED_MARKETPLACE',
+  /** A real product on a supported marketplace, in a category we do not track. */
+  CATEGORY_NOT_TRACKED: 'CATEGORY_NOT_TRACKED',
   UPSTREAM_UNAVAILABLE: 'UPSTREAM_UNAVAILABLE',
   INTERNAL: 'INTERNAL',
 } as const;

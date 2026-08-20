@@ -22,7 +22,7 @@
  * The trade-off is real and is documented at the call site in the API.
  */
 
-import { PrismaClient, type Platform } from '@pricetrail/database';
+import { PrismaClient, businessDateKey, type Platform } from '@pricetrail/database';
 import { LocalOnnxEmbeddingProvider } from '@pricetrail/embeddings';
 import { AmazonAdapter, FlipkartAdapter, type MarketplaceAdapter } from '@pricetrail/marketplace';
 import {
@@ -494,6 +494,27 @@ export async function startWorkerRuntime(
       QUEUE.maintenance,
       { task: 'retire-tracking' },
       { pattern: '30 4 * * 0', jobId: 'repeat-retire-tracking' },
+    );
+
+    // Once, now, in addition to the schedule below.
+    //
+    // The hourly pattern means a deploy that changes the category allowlist
+    // does nothing for up to an hour, and the catalogue visibly contradicts
+    // the rule in the meantime. Enqueuing one immediately closes that window.
+    //
+    // Safe to repeat on every boot: the free path is a database pass, and the
+    // fetch path is budgeted and shrinks to nothing once categories are
+    // stored. A fixed jobId means several replicas booting together still
+    // produce one run, not one each.
+    await producer.enqueue(
+      QUEUE.maintenance,
+      { task: 'reclassify-catalogue' },
+      {
+        // Date AND hour. Replicas booting together share an id and produce one
+        // run; a redeploy an hour later gets its own, which matters because
+        // the usual reason to redeploy is having just changed the allowlist.
+        jobId: `boot-reclassify-${businessDateKey()}-${new Date().getUTCHours()}`,
+      },
     );
 
     // Hourly, because the free half of this job is a database pass and the

@@ -17,6 +17,7 @@ export type ApiErrorCode =
   | 'QUOTA_EXCEEDED'
   | 'RATE_LIMITED'
   | 'UNSUPPORTED_MARKETPLACE'
+  | 'CATEGORY_NOT_TRACKED'
   | 'UPSTREAM_UNAVAILABLE'
   | 'INTERNAL'
   | 'NETWORK'
@@ -92,6 +93,12 @@ export class ApiError extends Error {
         return 'Could not reach the server. Check your connection.';
       case 'VALIDATION_FAILED':
         return this.fieldErrors[0]?.message ?? this.message;
+      case 'CATEGORY_NOT_TRACKED':
+        // The server names the category it found and what we do track, which
+        // is the only thing that lets someone tell "wrong site" from "wrong
+        // kind of product". Falling through to the generic message would turn
+        // a precise, actionable answer into "something went wrong".
+        return this.message;
       case 'UNSUPPORTED_MARKETPLACE':
         // Pass the server's text through verbatim. It names the supported
         // hosts, which is the one thing that lets the user fix the mistake.

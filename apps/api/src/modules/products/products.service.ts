@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import {
+  FlipkartAdapter,
   MarketplaceUrlError,
+  classifyForTracking,
   parseMarketplaceUrl,
   type ParsedMarketplaceUrl,
 } from '@pricetrail/marketplace';
@@ -47,6 +49,16 @@ export interface ProductSummary {
 
 @Injectable()
 export class ProductsService {
+  /**
+   * Built on first use and reused, not per request.
+   *
+   * A fresh adapter per search would rebuild its HTTP client every time and,
+   * worse, could spin up a browser pool per request under load. One instance
+   * costs nothing while idle — the browser is constructed lazily and only if a
+   * fetch actually escalates to it.
+   */
+  private flipkart: FlipkartAdapter | undefined;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly queue: QueueService,
@@ -73,8 +85,17 @@ export class ProductsService {
           externalId: parsed.externalId,
         },
       },
-      select: { productId: true },
+      select: { productId: true, platformData: true },
     });
+
+    // Refuse out-of-scope products at the point of search.
+    //
+    // Enforcing this only in the scrape job meant a shoe was accepted, tracked,
+    // and quietly stood down hours later — the person who searched it got a
+    // success, a product page, and no explanation when it stopped updating.
+    // Telling them now, naming the category, is the difference between a rule
+    // and a mystery.
+    await this.assertTrackableCategory(parsed, existing?.platformData);
 
     const productId = existing
       ? existing.productId
@@ -164,6 +185,80 @@ export class ProductsService {
    * null keeps the column non-nullable and gives the UI something honest to
    * render while `status` is PENDING.
    */
+  /**
+   * Throw if this product is in a category we do not collect.
+   *
+   * FAILS OPEN, DELIBERATELY. A category is only refused on a definite answer:
+   * the marketplace stated one and it is out of scope. If the page cannot be
+   * fetched, or states nothing, the search proceeds and the scrape job decides
+   * later.
+   *
+   * That asymmetry is the whole design. Flipkart rate-limiting us, or a
+   * network blip, must not turn every search on the site into a rejection —
+   * an outage would present as "PriceTrail refuses everything", which is far
+   * worse than briefly tracking a product that should not be. The scrape job
+   * still untracks it within the hour.
+   *
+   * Amazon always takes the open path: it cannot be scraped, so nothing here
+   * can learn its category. That is consistent with the classifier, which
+   * never guesses from silence.
+   */
+  private async assertTrackableCategory(
+    parsed: ParsedMarketplaceUrl,
+    storedPlatformData?: unknown,
+  ): Promise<void> {
+    // A listing we have already fetched carries its category, so the common
+    // case — re-searching something already tracked — costs nothing.
+    const stored =
+      storedPlatformData !== null &&
+      typeof storedPlatformData === 'object' &&
+      typeof (storedPlatformData as Record<string, unknown>)['category'] === 'string'
+        ? ((storedPlatformData as Record<string, unknown>)['category'] as string)
+        : undefined;
+
+    let category = stored;
+
+    if (category === undefined && parsed.platform === 'FLIPKART') {
+      try {
+        this.flipkart ??= new FlipkartAdapter({});
+        const outcome = await this.flipkart.fetchProduct({
+          externalId: parsed.externalId,
+          url: parsed.canonicalUrl,
+          // Shorter than the worker's budget. This runs inside a request a
+          // person is waiting on, and a slow marketplace must not hold a
+          // search open for fifteen seconds.
+          timeoutMs: 8000,
+        });
+        category = outcome.product.platformCategory;
+      } catch (error) {
+        // Fail open. See the note above.
+        this.logger.warn(
+          { err: error, url: parsed.canonicalUrl },
+          'category pre-check could not fetch; allowing the search',
+        );
+        return;
+      }
+    }
+
+    const decision = classifyForTracking(category, parsed.platform as Platform);
+    if (decision.action !== 'untrack') return;
+
+    throw new AppError(
+      ErrorCode.CATEGORY_NOT_TRACKED,
+      `PriceTrail tracks electronics, electronic accessories, home appliances ` +
+        `and smart home products. This one is listed under ` +
+        `"${decision.slug ?? 'an untracked category'}", so it is not collected.`,
+      422,
+      [
+        {
+          path: 'url',
+          message: `Category "${decision.slug}" is outside the tracked categories.`,
+          code: decision.reason,
+        },
+      ],
+    );
+  }
+
   private async createPendingProduct(parsed: ParsedMarketplaceUrl): Promise<string> {
     const placeholder = `${parsed.platform === 'AMAZON' ? 'Amazon' : 'Flipkart'} product ${parsed.externalId}`;
 
