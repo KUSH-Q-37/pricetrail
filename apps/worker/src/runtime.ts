@@ -467,6 +467,23 @@ export async function startWorkerRuntime(
   // requirement came from node-cron firing once per replica. BullMQ stores
   // repeatable schedules in Redis keyed by name+pattern, so registering from
   // every replica is idempotent and it still fires exactly once cluster-wide.
+  //
+  // EVERY PATTERN BELOW IS TIED TO THE KEEPALIVE PINGS, NOT CHOSEN FREELY.
+  //
+  // Render's free tier stops the service after roughly fifteen minutes without
+  // traffic, and a stopped process runs no cron. keepalive.yml wakes it at
+  // 01:45, 07:45, 13:45 and 19:45 UTC, so those four quarter-hours are the
+  // ONLY windows in which anything here can actually fire.
+  //
+  // This was learned the expensive way. Catalogue discovery was set to
+  // '20 */6 * * *' — 00:20, 06:20, 12:20, 18:20 — which lands in no window at
+  // all, and it silently never ran: the catalogue sat at 22 products while the
+  // logs showed a healthy worker with the schedule registered. The daily sweep
+  // worked the whole time purely because 02:00 happens to fall fifteen minutes
+  // after a ping.
+  //
+  // So a job scheduled outside a window is not "delayed". It does not run.
+  // Before changing any time here, check it against the keepalive cron.
   if (options.registerSchedules !== false) {
     await producer.schedule(
       QUEUE.maintenance,
@@ -476,7 +493,7 @@ export async function startWorkerRuntime(
     await producer.schedule(
       QUEUE.maintenance,
       { task: 'ensure-partitions' },
-      { pattern: '0 3 1 * *', jobId: 'repeat-ensure-partitions' },
+      { pattern: '58 7 1 * *', jobId: 'repeat-ensure-partitions' },
     );
     // Daily, and deliberately after the sweep rather than before it. Running
     // retention first would mean the day's collection and the day's deletion
@@ -486,14 +503,14 @@ export async function startWorkerRuntime(
     await producer.schedule(
       QUEUE.maintenance,
       { task: 'retention' },
-      { pattern: '0 4 * * *', jobId: 'repeat-retention' },
+      { pattern: '0 8 * * *', jobId: 'repeat-retention' },
     );
     // Weekly is enough: the cutoff moves by a month at a time, so running it
     // daily would scan the same rows seven times to find the same nothing.
     await producer.schedule(
       QUEUE.maintenance,
       { task: 'retire-tracking' },
-      { pattern: '30 4 * * 0', jobId: 'repeat-retire-tracking' },
+      { pattern: '58 13 * * 0', jobId: 'repeat-retire-tracking' },
     );
 
     // Once, now, in addition to the schedule below.
@@ -526,10 +543,23 @@ export async function startWorkerRuntime(
     await producer.schedule(
       QUEUE.maintenance,
       { task: 'reclassify-catalogue' },
-      { pattern: '50 * * * *', jobId: 'repeat-reclassify-catalogue' },
+      { pattern: '50 1,7,13,19 * * *', jobId: 'repeat-reclassify-catalogue' },
     );
 
-    // Catalogue discovery, six-hourly.
+    // Once at boot, as with reclassification.
+    //
+    // A schedule that only fires inside a keepalive window is fragile: miss
+    // one and the catalogue stops growing for six hours with nothing to show
+    // for it. A deploy is a moment the service is provably awake, so it is the
+    // one time a run is guaranteed. Cheap to repeat — the first thing the job
+    // does is COUNT tracked listings, and at the cap it fetches nothing.
+    await producer.enqueue(
+      QUEUE.maintenance,
+      { task: 'discover-catalogue' },
+      { jobId: `boot-discover-${businessDateKey()}-${new Date().getUTCHours()}` },
+    );
+
+    // Catalogue discovery.
     //
     // Frequent because it is cheap once full: the first thing it does is COUNT
     // tracked listings, and if that is at the cap it returns having fetched
@@ -545,7 +575,7 @@ export async function startWorkerRuntime(
       await producer.schedule(
         QUEUE.maintenance,
         { task: 'discover-catalogue' },
-        { pattern: '20 */6 * * *', jobId: 'repeat-discover-catalogue' },
+        { pattern: '55 7,13,19 * * *', jobId: 'repeat-discover-catalogue' },
       );
     }
   }

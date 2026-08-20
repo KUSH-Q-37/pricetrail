@@ -7,6 +7,9 @@
  * Requires the Docker infra to be running.
  *   pnpm --filter @pricetrail/worker test:integration
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { PrismaClient, findSimilarListings } from '@pricetrail/database';
 import {
   LocalOnnxEmbeddingProvider,
@@ -258,6 +261,67 @@ async function main(): Promise<void> {
   } finally {
     await provider.dispose?.();
     await prisma.$disconnect();
+  }
+
+  // -------------------------------------------------------------------------
+  section('SCHEDULES FIT INSIDE A KEEPALIVE WINDOW');
+  // -------------------------------------------------------------------------
+  //
+  // Render's free tier stops the service after ~15 minutes without traffic,
+  // and a stopped process runs no cron. keepalive.yml is what wakes it, so the
+  // only times anything can fire are the minutes just after a ping.
+  //
+  // This guard exists because a job scheduled outside those windows does not
+  // run LATE, it does not run AT ALL — and it fails silently, with a healthy
+  // worker and a registered schedule to look at. Catalogue discovery sat at
+  // '20 */6 * * *' for a day, matching no window, enrolling nothing, while
+  // everything reported fine.
+  {
+    // Relative to the package root, not the file. The worker compiles to
+    // CommonJS, where import.meta is a type error, and __dirname would point
+    // somewhere different under tsx than under tsc. process.cwd() is where the
+    // package script runs it from, and is the same either way.
+    const workflow = readFileSync(
+      resolve(process.cwd(), '../../.github/workflows/keepalive.yml'),
+      'utf8',
+    );
+    const runtime = readFileSync(resolve(process.cwd(), 'src/runtime.ts'), 'utf8');
+
+    const pingCron = /cron:\s*'(\d+)\s+([\d,]+)/.exec(workflow);
+    check('keepalive cron is readable', pingCron !== null, true);
+
+    const pingMinute = Number(pingCron?.[1] ?? -1);
+    const pingHours = (pingCron?.[2] ?? '').split(',').map(Number);
+    check('keepalive pings four times a day', pingHours.length, 4);
+
+    // Render's documented idle timeout. Fifteen rather than something roomier
+    // because a job that needs the slack is a job about to become flaky.
+    const AWAKE_MINUTES = 15;
+
+    const patterns = [...runtime.matchAll(/pattern: '([^']+)', jobId: '([^']+)'/g)];
+    check('schedules were found to check', patterns.length > 0, true);
+
+    for (const [, pattern, jobId] of patterns) {
+      const [minuteField, hourField] = (pattern ?? '').split(' ');
+      const minute = Number(minuteField);
+
+      // '*' means every hour, which necessarily includes the ping hours.
+      const hours =
+        hourField === '*'
+          ? pingHours
+          : (hourField ?? '')
+              .split(',')
+              .flatMap((part) => (part.includes('/') ? [] : [Number(part)]));
+
+      const fits = hours.some((hour) =>
+        pingHours.some((ping) => {
+          const offset = (hour - ping) * 60 + (minute - pingMinute);
+          return offset >= 0 && offset <= AWAKE_MINUTES;
+        }),
+      );
+
+      check(`${jobId} (${pattern}) fires while the service is awake`, fits, true);
+    }
   }
 
   console.log(`\n${'='.repeat(60)}`);
