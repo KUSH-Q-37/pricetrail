@@ -217,6 +217,15 @@ export class ProductsService {
     query: ListProductsQuery,
   ): Promise<{ items: ProductSummary[]; total: number; page: number; pageSize: number }> {
     const where: Prisma.ProductWhereInput = {
+      // Only products we are actually collecting.
+      //
+      // This used to list every product ever created, tracked or not, so a
+      // listing stood down for being outside the tracked categories — a kurti
+      // set, a tub of whey protein — stayed in the catalogue looking exactly
+      // like one being collected, with a chart that would never gain another
+      // point. Showing a product we have stopped observing, without saying so,
+      // is the same failure as showing a price we never observed.
+      listings: { some: { trackingEnabled: true } },
       ...(query.search
         ? { normalizedTitle: { contains: query.search.toLowerCase() } }
         : {}),

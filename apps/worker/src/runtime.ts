@@ -46,6 +46,7 @@ import {
   discoverCatalogue,
 } from './jobs/discover-catalogue';
 import { discoverCounterpart } from './jobs/discover-counterpart';
+import { reclassifyCatalogue } from './jobs/reclassify-catalogue';
 import { retireStaleTracking } from './jobs/retire-stale-tracking';
 import { embedMissingListings } from './jobs/embed-listings';
 import { planDailySweep } from './jobs/daily-sweep';
@@ -407,6 +408,21 @@ export async function startWorkerRuntime(
             return result;
           }
 
+          case 'reclassify-catalogue': {
+            // Applies scope to listings already here. The scope gate in
+            // scrape-listing only fires on fetch, so without this an allowlist
+            // change takes until the next nightly sweep to have any effect.
+            const result = await reclassifyCatalogue({
+              prisma,
+              getAdapter: (platform) => adapters[platform],
+              fetchBudget: Number(process.env['RECLASSIFY_FETCH_BUDGET'] ?? 150),
+              fetchDelayMs: Number(process.env['RECLASSIFY_FETCH_DELAY_MS'] ?? 2000),
+              logger,
+            });
+
+            return result;
+          }
+
           case 'retire-tracking': {
             // Retention bounds storage; this bounds work. Without it the daily
             // fetch bill grows monotonically with every URL anyone has ever
@@ -478,6 +494,18 @@ export async function startWorkerRuntime(
       QUEUE.maintenance,
       { task: 'retire-tracking' },
       { pattern: '30 4 * * 0', jobId: 'repeat-retire-tracking' },
+    );
+
+    // Hourly, because the free half of this job is a database pass and the
+    // paid half is budgeted. Running it often is what makes correcting the
+    // category allowlist take effect within the hour rather than overnight.
+    //
+    // At :50, clear of both the sweep and discovery, so a small instance is
+    // never doing three things at once.
+    await producer.schedule(
+      QUEUE.maintenance,
+      { task: 'reclassify-catalogue' },
+      { pattern: '50 * * * *', jobId: 'repeat-reclassify-catalogue' },
     );
 
     // Catalogue discovery, six-hourly.

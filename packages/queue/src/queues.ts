@@ -73,7 +73,9 @@ export type MaintenanceTask =
   /** Stops collecting listings nobody has searched or favourited in a long time. */
   | 'retire-tracking'
   /** Enrols products nobody has searched, so the catalogue grows on its own. */
-  | 'discover-catalogue';
+  | 'discover-catalogue'
+  /** Applies tracking scope to listings already in the catalogue. */
+  | 'reclassify-catalogue';
 
 export interface MaintenanceJob extends BaseJob {
   task: MaintenanceTask;
