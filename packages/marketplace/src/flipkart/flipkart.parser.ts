@@ -250,6 +250,7 @@ export function parseFlipkartProduct(
       jsonLd?.image ?? pickAttr(root, FLIPKART_SELECTORS.image, ['src', 'data-src']),
 
     rawAttributes: specs,
+    platformCategory: jsonLd?.category,
     platformData: extractPlatformData(root, html),
   };
 }

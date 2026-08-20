@@ -108,7 +108,10 @@ export const DEFAULT_DISCOVERY_SEEDS = [
   'memory card',
   'wifi router',
   'mobile charger',
-  'laptop bag',
+  // 'laptop bag' deliberately absent: Flipkart files those under `backpack`,
+  // alongside school and hiking bags, and that slug is not tracked. Seeding it
+  // would enrol products the next sweep immediately untracks, spending
+  // discovery budget to no end.
 
   // --- home appliances ------------------------------------------------------
   'refrigerator',

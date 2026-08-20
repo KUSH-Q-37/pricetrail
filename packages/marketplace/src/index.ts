@@ -7,6 +7,7 @@ export * from './shared/price';
 export * from './shared/availability';
 export * from './shared/text';
 export * from './shared/attributes';
+export * from './shared/tracked-categories';
 
 export * from './browser/browser-pool';
 export * from './fetch/parse-function';

@@ -72,6 +72,16 @@ export const FetchedProductSchema = z
     reviewCount: z.number().int().min(0).max(100_000_000).optional(),
     imageUrl: z.string().max(1024).optional(),
 
+    /**
+     * The marketplace's own category slug, verbatim ("mobile", "shoe").
+     *
+     * First-class rather than buried in platformData because tracking scope
+     * depends on it: this is what decides whether a product is collected at
+     * all. Absent when the page did not state one, which is always the case
+     * for Amazon, since it cannot be scraped.
+     */
+    platformCategory: z.string().max(120).optional(),
+
     /** Raw specification table, kept verbatim for re-extraction later. */
     rawAttributes: z.record(z.string(), z.string()).default({}),
     /** Platform-specific extras (sales rank, F-Assured, …). */

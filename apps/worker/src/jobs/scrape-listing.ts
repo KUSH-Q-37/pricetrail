@@ -10,6 +10,7 @@ import {
 } from '@pricetrail/database';
 import {
   FetchError,
+  classifyForTracking,
   normalizeAttributes,
   normalizeTitle,
   type FetchOutcome,
@@ -33,6 +34,14 @@ export interface ScrapeDeps {
   /** Resolved per platform so tests can inject a fixture-backed adapter. */
   getAdapter: (platform: Platform) => MarketplaceAdapter;
   now?: () => Date;
+  /**
+   * Optional so the existing tests, which construct deps directly, keep
+   * working. The only thing it currently reports is a listing dropped for
+   * being outside the tracked categories — which is invisible otherwise, and
+   * is exactly what you need to see when a product you expected to track
+   * quietly stops updating.
+   */
+  logger?: { info: (message: string, meta?: Record<string, unknown>) => void };
 }
 
 /**
@@ -56,7 +65,7 @@ export async function scrapeListing(
     queueJobId?: string;
   },
 ): Promise<ScrapeResult> {
-  const { prisma } = deps;
+  const { prisma, logger } = deps;
   const now = deps.now ?? (() => new Date());
   const startedAt = now();
 
@@ -152,6 +161,35 @@ export async function scrapeListing(
 
   const attributes = normalizeAttributes(product.rawAttributes);
 
+  // Scope check, at the first moment the product's category is actually known.
+  //
+  // It cannot happen at search time: ingest has a URL and nothing else, and a
+  // URL slug is not a category — "nike-revolution-6" is legible to a person
+  // and not to a parser, and Amazon URLs frequently carry no words at all. So
+  // a product is enrolled optimistically, and the first successful fetch is
+  // what decides whether it stays.
+  //
+  // Untracked, not deleted. The price observed on this run is still recorded:
+  // the fetch already happened and throwing the number away would leave a gap
+  // in a chart for no gain. What stops is FUTURE collection.
+  const scope = classifyForTracking(product.platformCategory);
+  if (scope.action === 'untrack') {
+    await prisma.marketplaceListing.update({
+      where: { id: input.listingId },
+      data: { trackingEnabled: false },
+    });
+
+    // Logged with the slug, because 'unknown-category' means this list needs
+    // extending, whereas 'not-in-scope' means it worked. The two are
+    // indistinguishable without the slug, and only one is a reason to act.
+    logger?.info('listing untracked: outside tracked categories', {
+      listingId: input.listingId,
+      category: scope.slug ?? '(none stated)',
+      reason: scope.reason,
+      title: product.title.slice(0, 80),
+    });
+  }
+
   const written = await prisma.$transaction(async (tx) => {
     await tx.marketplaceListing.update({
       where: { id: input.listingId },
@@ -174,7 +212,15 @@ export async function scrapeListing(
         availability: product.availability as Availability,
         source: product.source as DataSource,
         rawAttributes: product.rawAttributes,
-        platformData: product.platformData as never,
+        // Category folded into platformData rather than given its own column.
+        // It is exactly what platformData is for — platform-specific extras —
+        // and it means the value behind every tracking decision is queryable
+        // without a migration. Without it, "why did this stop updating?" can
+        // only be answered from logs that have since rotated.
+        platformData: {
+          ...product.platformData,
+          ...(product.platformCategory ? { category: product.platformCategory } : {}),
+        } as never,
         lastScrapedAt: finishedAt,
         lastSuccessAt: finishedAt,
         // Reset on success: the threshold counts CONSECUTIVE failures, so a

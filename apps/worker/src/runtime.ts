@@ -218,7 +218,7 @@ export async function startWorkerRuntime(
       QUEUE.scrape,
       async (job: Job<ScrapeListingJob>) => {
         const result = await scrapeListing(
-          { prisma, getAdapter: (platform) => adapters[platform] },
+          { prisma, getAdapter: (platform) => adapters[platform], logger },
           {
             listingId: job.data.listingId,
             platform: job.data.platform,

@@ -18,6 +18,17 @@ export interface JsonLdProduct {
   sellerName?: string;
   ratingValue?: string;
   reviewCount?: string;
+  /**
+   * Flipkart's own category slug — "mobile", "vacuum_cleaner",
+   * "refrigerator_new", "shoe".
+   *
+   * The marketplace's own classification, which beats anything inferable from
+   * a title. "boAt Airdopes 141" contains no category word at all, and a
+   * keyword classifier would have to know every brand's product naming to get
+   * it right. This is one field, stated by Flipkart, and it was already in the
+   * Product node we parse.
+   */
+  category?: string;
 }
 
 type Json = Record<string, unknown>;
@@ -124,6 +135,7 @@ export function extractJsonLdProduct(
       gtin13: asString(product['gtin13']),
       gtin: asString(product['gtin']),
       mpn: asString(product['mpn']),
+      category: asString(product['category']),
       image: imageUrl,
       brandName: asString(brand?.['name']) ?? asString(product['brand']),
       price: asString(offer?.['price']) ?? asString(offer?.['lowPrice']),
