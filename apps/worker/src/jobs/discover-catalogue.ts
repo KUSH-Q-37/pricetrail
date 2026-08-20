@@ -68,25 +68,71 @@ export interface DiscoverCatalogueResult {
 }
 
 /**
- * Default seeds: broad category words rather than specific models.
+ * Default seeds, scoped to four categories: electronics, electronic
+ * accessories, home appliances, and smart home.
  *
- * A generic term returns a wide spread of brands and price points, which is
- * what a price-comparison dataset wants. Seeding with "iphone 15" would return
- * forty near-identical listings and teach the matcher nothing.
+ * DELIBERATELY EXCLUDED: fashion, footwear, fitness equipment, stationery,
+ * toys, books, groceries. Not because they cannot be tracked — the Flipkart
+ * fetcher handles them fine, and a user who searches a pair of shoes still
+ * gets it tracked. They are excluded because discovery spends a FIXED budget,
+ * and every slot given to a category costs a slot in another. The cap is about
+ * 2 500 products; these categories are where price volatility, sale-time
+ * markups and cross-marketplace overlap actually live, which is what makes a
+ * price-history chart worth reading.
+ *
+ * Adding a category here does not enlarge the catalogue, it reallocates it.
+ *
+ * Broad category words rather than specific models: a generic term returns a
+ * spread of brands and price points, where "iphone 15" would return forty
+ * near-identical listings and teach the matcher nothing.
  */
 export const DEFAULT_DISCOVERY_SEEDS = [
+  // --- electronics ---------------------------------------------------------
   'smartphone',
   'laptop',
-  'headphones',
-  'smartwatch',
+  'tablet',
   'television',
+  'camera',
+  'monitor',
+  'printer',
+  'gaming console',
+
+  // --- electronic accessories ----------------------------------------------
+  'headphones',
+  'bluetooth speaker',
+  'power bank',
+  'smartwatch',
+  'wireless mouse',
+  'mechanical keyboard',
+  'pen drive',
+  'memory card',
+  'wifi router',
+  'mobile charger',
+  'laptop bag',
+
+  // --- home appliances ------------------------------------------------------
   'refrigerator',
   'washing machine',
   'air conditioner',
-  'tablet',
-  'camera',
-  'shoes',
-  'backpack',
+  'microwave oven',
+  'water purifier',
+  'mixer grinder',
+  'ceiling fan',
+  'water heater geyser',
+  'vacuum cleaner',
+  'air cooler',
+  'induction cooktop',
+  'kitchen chimney',
+  'dishwasher',
+  'air fryer',
+
+  // --- smart home -----------------------------------------------------------
+  'smart led bulb',
+  'smart speaker',
+  'smart plug',
+  'security camera cctv',
+  'video doorbell',
+  'smart door lock',
 ];
 
 /** Free-tier safe. See the storage note above. */
