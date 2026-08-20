@@ -54,6 +54,11 @@ const RESOURCES = [
   'itemInfo.externalIds',
   'itemInfo.manufactureInfo',
   'itemInfo.productInfo',
+  // Carries productGroup and binding, which is Amazon's own statement of what
+  // a product IS. Tracking scope depends on it: without this, an Amazon
+  // listing states no category, and a product nobody can classify is a product
+  // nobody can exclude.
+  'itemInfo.classifications',
   'itemInfo.technicalInfo',
   'offers.listings.price',
   'offers.listings.savingBasis',
@@ -353,6 +358,15 @@ export class AmazonApiFetcher implements FetchStrategy {
 
     const externalIds = prop(info, 'ExternalIds');
 
+    // productGroup first, binding as the fallback. ProductGroup is the coarser
+    // and more consistently populated of the two ("Personal Computer",
+    // "Shoes"); Binding is finer but often a format word rather than a
+    // category, so it is only worth reading when the group is absent.
+    const classifications = prop(info, 'Classifications');
+    const platformCategory =
+      displayValue(prop(classifications, 'ProductGroup')) ??
+      displayValue(prop(classifications, 'Binding'));
+
     return {
       platform: 'AMAZON',
       externalId: asin,
@@ -378,6 +392,8 @@ export class AmazonApiFetcher implements FetchStrategy {
       sellerName:
         cleanText(prop<string>(prop(listing, 'MerchantInfo'), 'Name')) || undefined,
       imageUrl: prop<string>(prop(prop(prop(item, 'Images'), 'Primary'), 'Large'), 'URL'),
+
+      platformCategory: cleanText(platformCategory) || undefined,
 
       rawAttributes,
       platformData: { source: 'creators-api' },

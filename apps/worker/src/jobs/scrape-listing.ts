@@ -172,7 +172,7 @@ export async function scrapeListing(
   // Untracked, not deleted. The price observed on this run is still recorded:
   // the fetch already happened and throwing the number away would leave a gap
   // in a chart for no gain. What stops is FUTURE collection.
-  const scope = classifyForTracking(product.platformCategory);
+  const scope = classifyForTracking(product.platformCategory, input.platform);
   if (scope.action === 'untrack') {
     await prisma.marketplaceListing.update({
       where: { id: input.listingId },

@@ -96,3 +96,48 @@ describe('classifyForTracking', () => {
     }
   });
 });
+
+describe('classifyForTracking on Amazon', () => {
+  // Amazon uses an entirely unrelated vocabulary for the same idea: Flipkart
+  // says `computer`, Amazon says `Personal Computer`. Running both through one
+  // list would untrack half of whichever platform the list was not built from.
+  it('untracks the product groups that are clearly out of scope', () => {
+    for (const group of ['Shoes', 'Apparel', 'Book', 'Toy', 'Grocery', 'Watch']) {
+      const decision = classifyForTracking(group, 'AMAZON');
+      expect(decision.action, `${group} should untrack`).toBe('untrack');
+      expect(decision.reason).toBe('not-in-scope');
+    }
+  });
+
+  it('leaves an unrecognised Amazon group alone rather than untracking it', () => {
+    // The asymmetry with Flipkart is deliberate. Flipkart's vocabulary was
+    // measured live; Amazon's cannot be until credentials exist, so an
+    // allowlist here would untrack every legitimate product whose group name
+    // was guessed wrong — a laptop under "Personal Computer" would silently
+    // vanish and look like a broken Amazon integration.
+    expect(classifyForTracking('Personal Computer', 'AMAZON').action).toBe('leave');
+    expect(classifyForTracking('CE', 'AMAZON').action).toBe('leave');
+  });
+
+  it('is case-insensitive about product groups', () => {
+    expect(classifyForTracking('SHOES', 'AMAZON').action).toBe('untrack');
+    expect(classifyForTracking('  shoes  ', 'AMAZON').action).toBe('untrack');
+  });
+
+  it('does not apply the Flipkart allowlist to Amazon, or vice versa', () => {
+    // `mobile` is a Flipkart slug. Amazon never emits it, and if it somehow
+    // did, it must not be silently accepted through the wrong platform's list.
+    expect(classifyForTracking('mobile', 'FLIPKART').action).toBe('track');
+    expect(classifyForTracking('mobile', 'AMAZON').action).toBe('leave');
+
+    // `Shoes` is Amazon's spelling; Flipkart's is `shoe`. Each untracks under
+    // its own platform, and neither is required to know the other's.
+    expect(classifyForTracking('Shoes', 'AMAZON').action).toBe('untrack');
+    expect(classifyForTracking('shoe', 'FLIPKART').action).toBe('untrack');
+  });
+
+  it('still leaves a product that states nothing', () => {
+    // Every Amazon listing today, since Amazon cannot be scraped.
+    expect(classifyForTracking(undefined, 'AMAZON').action).toBe('leave');
+  });
+});

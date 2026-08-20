@@ -30,6 +30,10 @@
  * a whole category out of scope.
  */
 export function normalizeCategorySlug(slug: string): string {
+  // Lowercased and _new-stripped. Amazon's groups are multi-word with spaces
+  // ("Personal Computer"); Flipkart's are underscored slugs. Both are compared
+  // as-is beyond case, because inventing a shared shape for two unrelated
+  // vocabularies would only make each match the other's entries by accident.
   return slug.trim().toLowerCase().replace(/_new$/, '');
 }
 
@@ -108,28 +112,24 @@ export interface CategoryDecision {
   /**
    * What to do about tracking.
    *
-   *   'track'   — the page stated a category and it is in scope
-   *   'untrack' — the page stated a category and it is not
-   *   'leave'   — no category was stated; not enough to act on
+   *   'track'   — the marketplace stated a category and it is in scope
+   *   'untrack' — the marketplace stated a category and it is not
+   *   'leave'   — nothing usable was stated; not enough to act on
    *
    * Three outcomes rather than a boolean, because "not in scope" and "we do
-   * not know" must not collapse into the same action. Amazon cannot be scraped
-   * and so never states a category: treating silence as grounds to untrack
-   * would stand down every Amazon listing the moment Creators API credentials
-   * arrived, permanently and invisibly. Absence of evidence is not evidence.
-   *
-   * The practical consequence is that scope is enforced strictly where it can
-   * be — Flipkart, which states a category on every product page and is where
-   * all collection currently happens — and not guessed anywhere else.
+   * not know" must not collapse into the same action. Treating silence as
+   * grounds to untrack would stand down every listing whose page happens not
+   * to say — which for Amazon is all of them. Absence of evidence is not
+   * evidence.
    */
   action: 'track' | 'untrack' | 'leave';
-  /** Normalized slug, or undefined when the page stated no category. */
+  /** Normalized category, or undefined when nothing was stated. */
   slug?: string;
   reason: 'allowed' | 'not-in-scope' | 'unknown-category' | 'no-category-stated';
 }
 
-/** Known-excluded, as opposed to merely absent from the allowlist. */
-const KNOWN_EXCLUDED: ReadonlySet<string> = new Set([
+/** Known-excluded on Flipkart, as opposed to merely absent from the allowlist. */
+const FLIPKART_EXCLUDED: ReadonlySet<string> = new Set([
   'shoe',
   'sport_mat',
   'diary_notebook',
@@ -137,14 +137,84 @@ const KNOWN_EXCLUDED: ReadonlySet<string> = new Set([
   'backpack',
 ]);
 
+/**
+ * Amazon's ProductGroup values for things this project does not track.
+ *
+ * A DENYLIST, where Flipkart gets an allowlist, and the asymmetry is
+ * deliberate rather than sloppy.
+ *
+ * Flipkart's vocabulary was measured: 39 categories searched live, both
+ * samples agreeing every time. Amazon's cannot be, because there are no
+ * Creators API credentials in this project and the account cannot obtain them
+ * until it has qualifying sales. These values come from the documented
+ * ProductGroup vocabulary, NOT from observation.
+ *
+ * That difference decides the shape. An allowlist built on an unverified
+ * vocabulary would untrack every legitimate product whose group name we
+ * guessed wrong — a laptop filed under "Personal Computer" rather than
+ * "computer" would silently vanish, and the symptom would look like a broken
+ * Amazon integration. A denylist fails the other way: something out of scope
+ * slips through until its group is added. That is the survivable error.
+ *
+ * WHEN CREDENTIALS ARRIVE: run one pass over a handful of known ASINs across
+ * these categories, read the real productGroup values, and convert this to an
+ * allowlist the way Flipkart's was built. Until then it is a best effort that
+ * catches the obvious cases and admits it.
+ */
+const AMAZON_EXCLUDED: ReadonlySet<string> = new Set([
+  'shoes',
+  'apparel',
+  'book',
+  'books',
+  'ebooks',
+  'toy',
+  'toys',
+  'grocery',
+  'sports',
+  'health and beauty',
+  'beauty',
+  'baby product',
+  'pet products',
+  'jewelry',
+  'watch',
+  'luggage',
+  'shoes and accessories',
+  'lawn & patio',
+  'music',
+  'dvd',
+  'video games',
+  'automotive',
+  'furniture',
+  'art and craft supply',
+  'office product',
+]);
+
+/**
+ * Decide whether a product belongs in the tracked catalogue.
+ *
+ * Platform-aware because the two marketplaces use entirely unrelated
+ * vocabularies for the same idea. Flipkart says `computer`; Amazon says
+ * `Personal Computer`. Running both through one list would untrack half of
+ * whichever platform the list was not built from.
+ */
 export function classifyForTracking(
   rawCategory: string | undefined,
+  platform: 'AMAZON' | 'FLIPKART' = 'FLIPKART',
 ): CategoryDecision {
   if (!rawCategory || rawCategory.trim().length === 0) {
     return { action: 'leave', reason: 'no-category-stated' };
   }
 
   const slug = normalizeCategorySlug(rawCategory);
+
+  if (platform === 'AMAZON') {
+    // Denylist: exclude what is known, leave the rest alone. See the note on
+    // AMAZON_EXCLUDED for why this is not an allowlist.
+    return AMAZON_EXCLUDED.has(slug)
+      ? { action: 'untrack', slug, reason: 'not-in-scope' }
+      : { action: 'leave', slug, reason: 'allowed' };
+  }
+
   if (TRACKED_CATEGORY_SLUGS.has(slug)) {
     return { action: 'track', slug, reason: 'allowed' };
   }
@@ -156,6 +226,6 @@ export function classifyForTracking(
   return {
     action: 'untrack',
     slug,
-    reason: KNOWN_EXCLUDED.has(slug) ? 'not-in-scope' : 'unknown-category',
+    reason: FLIPKART_EXCLUDED.has(slug) ? 'not-in-scope' : 'unknown-category',
   };
 }
