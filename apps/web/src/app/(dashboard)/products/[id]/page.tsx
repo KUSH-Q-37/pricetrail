@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProduct } from '@/hooks/use-products';
-import { formatPrice, formatRelativeTime } from '@/lib/utils';
+import { formatPrice } from '@/lib/utils';
 
 export default function ProductDetailPage({
   params,
@@ -112,29 +112,6 @@ export default function ProductDetailPage({
                         </div>
                       )}
                     </div>
-
-                    <dl className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <dt className="text-muted-foreground">Identifier</dt>
-                        <dd className="font-mono">{listing.externalId}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-muted-foreground">Availability</dt>
-                        <dd>{listing.availability.replace(/_/g, ' ').toLowerCase()}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-muted-foreground">Seller</dt>
-                        <dd>{listing.sellerName ?? '—'}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-muted-foreground">Last checked</dt>
-                        <dd>
-                          {listing.lastSuccessAt
-                            ? formatRelativeTime(listing.lastSuccessAt)
-                            : 'never'}
-                        </dd>
-                      </div>
-                    </dl>
 
                     {listing.consecutiveFailures > 0 ? (
                       <Alert tone="warning">
