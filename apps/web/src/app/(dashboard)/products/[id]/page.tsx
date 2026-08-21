@@ -99,17 +99,20 @@ export default function ProductDetailPage({
                           No price recorded yet
                         </p>
                       ) : (
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-2xl font-semibold tabular-price">
-                            {formatPrice(listing.currentPriceMinor, listing.currency)}
-                          </span>
-                          {listing.mrpMinor &&
-                          listing.mrpMinor > listing.currentPriceMinor ? (
-                            <span className="text-sm text-muted-foreground line-through tabular-price">
-                              {formatPrice(listing.mrpMinor, listing.currency)}
-                            </span>
-                          ) : null}
-                        </div>
+                        // The price, and only the price.
+                        //
+                        // A struck-through MRP beside it used to sit here, and
+                        // it was the one number on the page nobody is ever
+                        // charged. Worse, it is the number a marketplace RAISES
+                        // to manufacture a discount — the exact move this
+                        // project exists to expose. Printing it in the house
+                        // style of a sale tag lent it our credibility.
+                        //
+                        // What a shopper needs is what this costs today, and
+                        // the chart below for whether that is actually low.
+                        <p className="text-2xl font-semibold tabular-price">
+                          {formatPrice(listing.currentPriceMinor, listing.currency)}
+                        </p>
                       )}
                     </div>
 
