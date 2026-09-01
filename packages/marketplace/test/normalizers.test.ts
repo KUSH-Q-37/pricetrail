@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { normalizeAvailability } from '../src/shared/availability';
-import { computeDiscountPercent, parsePriceToMinor } from '../src/shared/price';
+import { computeDiscountPercent, parsePriceToMinor, parseDiscountPercent } from '../src/shared/price';
 import {
   extractCapacity,
   extractMemory,
@@ -55,7 +55,16 @@ describe('discount', () => {
     // undefined, not 0 — so the UI can tell "no offer" from "0% off".
     expect(computeDiscountPercent(1000, 1000)).toBeUndefined();
     expect(computeDiscountPercent(2000, 1000)).toBeUndefined();
-    expect(computeDiscountPercent(undefined, 1000)).toBeUndefined();
+    expect(computeDiscountPercent(1500000, 1000000)).toBeUndefined();
+  });
+
+  it('parses explicit discount percentages', () => {
+    expect(parseDiscountPercent('-33%')).toBe(33);
+    expect(parseDiscountPercent('33% off')).toBe(33);
+    expect(parseDiscountPercent(null)).toBeUndefined();
+    expect(parseDiscountPercent('no discount')).toBeUndefined();
+    expect(parseDiscountPercent('0%')).toBeUndefined();
+    expect(parseDiscountPercent('100%')).toBeUndefined();
   });
 });
 
@@ -139,9 +148,11 @@ describe('attribute extraction', () => {
     });
   });
 
-  it('converts TB to GB and treats a bare size as storage', () => {
+  it('converts TB and MB to GB and treats a bare size as storage', () => {
     expect(extractMemory('1 TB SSD')).toEqual({ storage_gb: 1024 });
     expect(extractMemory('256 GB')).toEqual({ storage_gb: 256 });
+    expect(extractMemory('10240 MB')).toEqual({ storage_gb: 10 });
+    expect(extractMemory('100 KB')).toEqual({});
   });
 
   it('keeps appliance capacities in separate units', () => {
@@ -157,6 +168,12 @@ describe('attribute extraction', () => {
     expect(extractStarRating('5-Star')).toBe(5);
   });
 
+  it('extracts screen inches', () => {
+    expect(normalizeAttributes({ 'Display': '15.49 cm (6.1 inch)' }).screen_in).toBe(6.1);
+    expect(normalizeAttributes({ 'Screen Size': '6.1"' }).screen_in).toBe(6.1);
+    expect(normalizeAttributes({ 'Size': '0.5 inches' }).screen_in).toBeUndefined();
+  });
+
   it('folds a spec table into normalised attributes', () => {
     expect(
       normalizeAttributes({
@@ -164,13 +181,29 @@ describe('attribute extraction', () => {
         'Internal Storage': '256 GB',
         Colour: 'Natural Titanium',
         'Item model number': 'A3102',
+        'Model Year': '2026',
       }),
     ).toEqual({
       ram_gb: 8,
       storage_gb: 256,
       colour: 'natural titanium',
       model_number: 'A3102',
+      model_year: 2026,
     });
+  });
+
+  it('extracts model year correctly from various aliases', () => {
+    expect(
+      normalizeAttributes({ 'Launch Year': '2025' }),
+    ).toEqual(expect.objectContaining({ model_year: 2025 }));
+    
+    expect(
+      normalizeAttributes({ 'Release Year': '2024 model' }),
+    ).toEqual(expect.objectContaining({ model_year: 2024 }));
+    
+    expect(
+      normalizeAttributes({ 'Year': '2027' }),
+    ).toEqual(expect.objectContaining({ model_year: 2027 }));
   });
 });
 
