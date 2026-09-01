@@ -33,7 +33,7 @@ test.describe('public access', () => {
 
   test('a product page is reachable directly', async ({ page }) => {
     await page.goto(`/products/${SEEDED_PRODUCT}`);
-    await expect(page.getByRole('heading', { name: /iPhone 15 Pro/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Sony Bravia/i })).toBeVisible();
   });
 });
 
@@ -41,7 +41,7 @@ test.describe('price history chart', () => {
   test('renders the seeded product with a chart, and switches range', async ({ page }) => {
     await page.goto(`/products/${SEEDED_PRODUCT}`);
 
-    await expect(page.getByRole('heading', { name: /iPhone 15 Pro/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Sony Bravia/i })).toBeVisible();
 
     // Assert on the range selector rather than the panel's title text: roles
     // and accessible names are stable, whereas a getByText on a heading is
