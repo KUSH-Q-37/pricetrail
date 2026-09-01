@@ -95,14 +95,14 @@ async function main(): Promise<void> {
       orderBy: { createdAt: 'asc' },
     });
 
-    const amazonIphone = seeded.find((l) => /iphone/i.test(l.title));
+    const amazonSony = seeded.find((l) => /sony/i.test(l.title));
     const amazonFridge = seeded.find((l) => /refrigerator/i.test(l.title));
 
-    if (!amazonIphone || !amazonFridge) {
+    if (!amazonSony || !amazonFridge) {
       throw new Error('Seed data missing — run `pnpm db:seed` first');
     }
 
-    for (const listing of [amazonIphone, amazonFridge]) {
+    for (const listing of [amazonSony, amazonFridge]) {
       const text = buildEmbeddingText({
         title: listing.title,
         brand: listing.brand ?? undefined,
@@ -137,15 +137,15 @@ async function main(): Promise<void> {
       prisma,
       provider,
       {
-        id: amazonIphone.id,
-        platform: amazonIphone.platform,
-        title: amazonIphone.title,
-        brand: amazonIphone.brand,
-        modelNumber: amazonIphone.modelNumber,
-        ean: amazonIphone.ean,
-        upc: amazonIphone.upc,
-        category: amazonIphone.product.category,
-        attributes: amazonIphone.product.attributes as Record<string, string | number>,
+        id: amazonSony.id,
+        platform: amazonSony.platform,
+        title: amazonSony.title,
+        brand: amazonSony.brand,
+        modelNumber: amazonSony.modelNumber,
+        ean: amazonSony.ean,
+        upc: amazonSony.upc,
+        category: amazonSony.product.category,
+        attributes: amazonSony.product.attributes as Record<string, string | number>,
       },
       { limitPerSource: 10 },
     );
@@ -158,7 +158,7 @@ async function main(): Promise<void> {
     }
 
     check('found at least one candidate', candidates.length > 0, true);
-    check('true twin is ranked first', candidates[0]?.productId, amazonIphone.productId);
+    check('true twin is ranked first', candidates[0]?.productId, amazonSony.productId);
     // Seed data carries a shared EAN, so the identifier generator must fire.
     check(
       'identifier generator contributed',
@@ -175,13 +175,13 @@ async function main(): Promise<void> {
     section('MATCHING PIPELINE WITH A REAL EMBEDDING COSINE');
     // -----------------------------------------------------------------------
     const flipkartTwin = await prisma.marketplaceListing.findFirst({
-      where: { productId: amazonIphone.productId, platform: 'FLIPKART' },
+      where: { productId: amazonSony.productId, platform: 'FLIPKART' },
       include: { product: true },
     });
     if (!flipkartTwin) throw new Error('Flipkart twin missing from seed');
 
     const toMatchInput = (
-      listing: typeof amazonIphone,
+      listing: typeof amazonSony,
     ): MatchInput => ({
       platform: listing.platform as 'AMAZON' | 'FLIPKART',
       externalId: listing.externalId,
@@ -197,9 +197,9 @@ async function main(): Promise<void> {
 
     const [vecA, vecB] = await provider.embed([
       buildEmbeddingText({
-        title: amazonIphone.title,
-        brand: amazonIphone.brand ?? undefined,
-        attributes: amazonIphone.product.attributes as Record<string, string | number>,
+        title: amazonSony.title,
+        brand: amazonSony.brand ?? undefined,
+        attributes: amazonSony.product.attributes as Record<string, string | number>,
       }),
       buildEmbeddingText({
         title: flipkartTwin.title,
@@ -212,13 +212,13 @@ async function main(): Promise<void> {
     console.log(`  real embedding cosine: ${realCosine.toFixed(4)}`);
 
     const withEmbedding = matchProducts(
-      toMatchInput(amazonIphone),
-      toMatchInput(flipkartTwin as typeof amazonIphone),
+      toMatchInput(amazonSony),
+      toMatchInput(flipkartTwin as typeof amazonSony),
       { semanticSimilarity: realCosine },
     );
     const withoutEmbedding = matchProducts(
-      toMatchInput(amazonIphone),
-      toMatchInput(flipkartTwin as typeof amazonIphone),
+      toMatchInput(amazonSony),
+      toMatchInput(flipkartTwin as typeof amazonSony),
     );
 
     console.log(`  decision (with embedding)   : ${withEmbedding.decision} @ ${withEmbedding.confidence}`);
@@ -239,16 +239,16 @@ async function main(): Promise<void> {
     {
       // Strip identifiers so the barcode floor cannot carry the decision, and
       // confirm the embedding is what moves it past the threshold.
-      const stripped = (listing: typeof amazonIphone): MatchInput => ({
+      const stripped = (listing: typeof amazonSony): MatchInput => ({
         ...toMatchInput(listing),
         ean: undefined,
         upc: undefined,
       });
 
-      const lexical = matchProducts(stripped(amazonIphone), stripped(flipkartTwin as typeof amazonIphone));
+      const lexical = matchProducts(stripped(amazonSony), stripped(flipkartTwin as typeof amazonSony));
       const embedded = matchProducts(
-        stripped(amazonIphone),
-        stripped(flipkartTwin as typeof amazonIphone),
+        stripped(amazonSony),
+        stripped(flipkartTwin as typeof amazonSony),
         { semanticSimilarity: realCosine },
       );
 

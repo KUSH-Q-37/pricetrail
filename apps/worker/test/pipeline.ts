@@ -67,10 +67,14 @@ function startFixtureServer(): Promise<{ server: Server; baseUrl: string }> {
       }
 
       try {
+        const content = readFileSync(join(FIXTURES, platform ?? 'amazon', `${name}.html`), 'utf8');
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-        res.end(readFileSync(join(FIXTURES, platform ?? 'amazon', `${name}.html`), 'utf8'));
-      } catch {
-        res.writeHead(404, { 'content-type': 'text/html' });
+        res.end(content);
+      } catch (e) {
+        console.error('Mock server error reading file:', String(e));
+        if (!res.headersSent) {
+          res.writeHead(404, { 'content-type': 'text/html' });
+        }
         res.end('not found');
       }
     });
@@ -107,7 +111,7 @@ async function main(): Promise<void> {
           create: {
             platform: 'AMAZON',
             externalId,
-            url: `${baseUrl}/amazon/iphone-in-stock`,
+            url: `${baseUrl}/amazon/fridge-limited-stock`,
             title: placeholder,
             normalizedTitle: placeholder.toLowerCase(),
             trackingEnabled: true,
@@ -132,7 +136,7 @@ async function main(): Promise<void> {
         listingId,
         platform: 'AMAZON',
         externalId,
-        url: `${baseUrl}/amazon/iphone-in-stock`,
+        url: `${baseUrl}/amazon/fridge-limited-stock`,
         queueJobId: 'test-job-1',
       },
     );
@@ -148,17 +152,17 @@ async function main(): Promise<void> {
     const afterListing = afterProduct.listings[0]!;
 
     check('product promoted to READY', afterProduct.status, 'READY');
-    check('real title replaced the placeholder', afterProduct.displayTitle, 'Apple iPhone 15 Pro (256 GB) - Natural Titanium');
-    check('brand extracted', afterProduct.brand, 'Apple');
-    check('attributes normalised onto the product', (afterProduct.attributes as Record<string, unknown>)['storage_gb'], 256);
-    check('listing price populated', afterListing.currentPriceMinor, 13499900);
-    check('MRP populated', afterListing.mrpMinor, 14990000);
-    check('EAN captured', afterListing.ean, '0195949022029');
+    check('real title replaced the placeholder', afterProduct.displayTitle, 'LG 260 L 3 Star Frost Free Double Door Refrigerator (Shiny Steel)');
+    check('brand extracted', afterProduct.brand, 'LG');
+    check('attributes normalised onto the product', (afterProduct.attributes as Record<string, unknown>)['capacity_l'], 260);
+    check('listing price populated', afterListing.currentPriceMinor, 2899000);
+    check('MRP populated', afterListing.mrpMinor, 3799000);
+    check('EAN captured', afterListing.ean, null);
     check('failure counter reset', afterListing.consecutiveFailures, 0);
 
     const points = await prisma.pricePoint.findMany({ where: { listingId } });
     check('exactly one price point', points.length, 1);
-    check('price point value', points[0]!.priceMinor, 13499900);
+    check('price point value', points[0]!.priceMinor, 2899000);
 
     const audit = await prisma.scrapeJob.findMany({ where: { listingId } });
     check('audit row written', audit.length, 1);
@@ -178,7 +182,7 @@ async function main(): Promise<void> {
         listingId,
         platform: 'AMAZON',
         externalId,
-        url: `${baseUrl}/amazon/iphone-in-stock`,
+        url: `${baseUrl}/amazon/fridge-limited-stock`,
         queueJobId: 'test-job-1-redelivered',
       },
     );
@@ -216,7 +220,7 @@ async function main(): Promise<void> {
       where: { id: listingId },
     });
 
-    check('price survived the failed fetch', stillGood.currentPriceMinor, 13499900);
+    check('price survived the failed fetch', stillGood.currentPriceMinor, 2899000);
     check('failure counter incremented', stillGood.consecutiveFailures, 1);
     check('tracking still enabled after 1 failure', stillGood.trackingEnabled, true);
 
@@ -250,7 +254,7 @@ async function main(): Promise<void> {
       where: { id: listingId },
     });
     check(`tracking auto-paused at >=${FAILURE_PAUSE_THRESHOLD} failures`, paused.trackingEnabled, false);
-    check('price STILL preserved', paused.currentPriceMinor, 13499900);
+    check('price STILL preserved', paused.currentPriceMinor, 2899000);
 
     // -----------------------------------------------------------------------
     section('HTTP ERROR MAPPING');
@@ -312,7 +316,7 @@ async function main(): Promise<void> {
             listingId,
             platform: 'AMAZON',
             externalId,
-            url: `${baseUrl}/amazon/iphone-in-stock`,
+            url: `${baseUrl}/amazon/fridge-limited-stock`,
           },
           { jobId: `ingest-${listingId}` },
         );
@@ -325,7 +329,7 @@ async function main(): Promise<void> {
             listingId,
             platform: 'AMAZON',
             externalId,
-            url: `${baseUrl}/amazon/iphone-in-stock`,
+            url: `${baseUrl}/amazon/fridge-limited-stock`,
           },
           { jobId: `ingest-${listingId}` },
         );
