@@ -75,7 +75,9 @@ export type MaintenanceTask =
   /** Enrols products nobody has searched, so the catalogue grows on its own. */
   | 'discover-catalogue'
   /** Applies tracking scope to listings already in the catalogue. */
-  | 'reclassify-catalogue';
+  | 'reclassify-catalogue'
+  /** Applies yearly tracking lifecycle logic to enforce the 15K pool limit */
+  | 'yearly-rollover';
 
 export interface MaintenanceJob extends BaseJob {
   task: MaintenanceTask;

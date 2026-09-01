@@ -51,7 +51,11 @@ export default function ProductDetailPage({
             <h1 className="text-2xl font-semibold tracking-tight">{data.title}</h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               {data.brand ? <Badge variant="outline">{data.brand}</Badge> : null}
-              <Badge variant="secondary">{data.category}</Badge>
+              {data.category !== 'OTHER' ? (
+                <Badge variant="secondary">
+                  {data.category.replace(/_/g, ' ')}
+                </Badge>
+              ) : null}
               {data.status === 'PENDING' ? (
                 <Badge variant="warning">
                   <Loader2 className="size-3 animate-spin" aria-hidden="true" />

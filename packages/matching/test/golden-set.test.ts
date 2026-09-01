@@ -7,21 +7,18 @@ import { GOLDEN_SET } from './golden-set';
 
 describe('category schemas', () => {
   it('vetoes capacity variants per category', () => {
-    expect(getVetoKeys('PHONE')).toEqual(['storage_gb', 'ram_gb']);
     expect(getVetoKeys('REFRIGERATOR')).toEqual(['capacity_l', 'star_rating']);
+    expect(getVetoKeys('WASHING_MACHINE')).toEqual(['capacity_kg', 'star_rating']);
   });
 
-  it('vetoes screen size on laptops but not phones', () => {
-    // 13" vs 15" is a different laptop SKU; on a phone it is a spec detail.
-    // This asymmetry is why the schemas are category-dispatched.
-    expect(getVetoKeys('LAPTOP')).toContain('screen_in');
-    expect(getVetoKeys('PHONE')).not.toContain('screen_in');
+  it('vetoes screen size on televisions', () => {
+    expect(getVetoKeys('TELEVISION')).toContain('screen_in');
   });
 
   it('never vetoes colour', () => {
     // Marketplaces name the same finish differently; vetoing here would
     // discard a large share of genuine matches.
-    expect(getVetoKeys('PHONE')).not.toContain('colour');
+    expect(getVetoKeys('AUDIO')).not.toContain('colour');
   });
 
   it('has no attribute vetoes for an uncategorised product', () => {
@@ -126,8 +123,8 @@ describe('scoring behaviour', () => {
   it('zeroes confidence on a vetoed pair', () => {
     // Retaining a high score would let someone sort the review queue by
     // confidence and "rescue" a pair the engine already rejected.
-    const phoneVsCase = GOLDEN_SET.find((c) => c.name === 'PHONE vs ITS OWN CASE')!;
-    const result = matchProducts(phoneVsCase.a, phoneVsCase.b);
+    const tvVsMount = GOLDEN_SET.find((c) => c.name === 'TV vs ITS OWN MOUNT')!;
+    const result = matchProducts(tvVsMount.a, tvVsMount.b);
 
     expect(result.confidence).toBe(0);
     expect(result.vetoReason).toBe('ACCESSORY_VS_DEVICE');

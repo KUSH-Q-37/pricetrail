@@ -17,6 +17,7 @@ import {
   type FetchOutcome,
   type MarketplaceAdapter,
 } from '@pricetrail/marketplace';
+import { evaluateProductLifecycle } from './lifecycle-manager';
 
 /** Consecutive failures after which a listing stops being fetched. */
 export const FAILURE_PAUSE_THRESHOLD = 5;
@@ -191,7 +192,7 @@ export async function scrapeListing(
     });
   }
 
-  const written = await prisma.$transaction(async (tx) => {
+  const txResult = await prisma.$transaction(async (tx) => {
     await tx.marketplaceListing.update({
       where: { id: input.listingId },
       data: {
@@ -230,25 +231,30 @@ export async function scrapeListing(
       },
     });
 
-    // Promote the canonical product out of PENDING and fill in what the
-    // fetcher learned. This is what flips the UI from "Fetching details".
+    const canonicalId = (await tx.marketplaceListing.findUniqueOrThrow({
+      where: { id: input.listingId },
+      select: { productId: true },
+    })).productId;
+    
     await tx.product.update({
-      where: { id: (await tx.marketplaceListing.findUniqueOrThrow({
-        where: { id: input.listingId },
-        select: { productId: true },
-      })).productId },
+      where: { id: canonicalId },
       data: {
         status: ProductStatus.READY,
         displayTitle: product.title,
         normalizedTitle: normalizeTitle(product.title),
         brand: product.brand ?? null,
         modelNumber: product.modelNumber ?? null,
+        modelYear: (attributes.model_year as number) ?? null,
         imageUrl: product.imageUrl ?? null,
         attributes: attributes as never,
       },
     });
 
-    if (product.priceMinor === undefined) return false;
+    // Evaluate its lifecycle and possibly activate it.
+    // Done within the transaction but it makes separate queries. Wait! The lifecycle function uses PrismaClient, not a tx client, so it must be called OUTSIDE the transaction.
+    // I'll return the canonicalId from this transaction so we can run it after.
+
+    if (product.priceMinor === undefined) return { written: false, canonicalId };
 
     // At most one row per listing per day, holding the LATEST observation of
     // that day.
@@ -319,7 +325,7 @@ export async function scrapeListing(
       });
 
       // Not news: the price is exactly where it was yesterday.
-      return false;
+      return { written: false, canonicalId };
     }
 
     // A new price, a first observation, or the first check after a gap.
@@ -333,8 +339,15 @@ export async function scrapeListing(
       update: { ...payload, lastConfirmedOn: capturedOn },
     });
 
-    return latest === null || latest.priceMinor !== product.priceMinor;
+    return { 
+      written: latest === null || latest.priceMinor !== product.priceMinor, 
+      canonicalId 
+    };
   });
+
+  // Now outside the transaction, run lifecycle check
+  await evaluateProductLifecycle(prisma, txResult.canonicalId);
+  const written = txResult.written;
 
   await prisma.scrapeJob.update({
     where: { id: auditRow.id },

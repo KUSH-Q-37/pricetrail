@@ -51,8 +51,8 @@ section('TEXT BUILDER');
 // ---------------------------------------------------------------------------
 check(
   'brand and model lead the text',
-  buildEmbeddingText({ title: 'iPhone 15 Pro', brand: 'Apple', modelNumber: 'A3102' }),
-  'apple a3102 iphone 15 pro',
+  buildEmbeddingText({ title: 'Sony Bravia 55 inch', brand: 'Sony', modelNumber: 'KD-55X74K' }),
+  'sony kd-55x74k bravia 55 inch',
 );
 
 // Marketplace marketing noise pushes identical products apart in vector space.
@@ -70,32 +70,33 @@ check(
 // Repeating the brand inflates its weight in the pooled vector for no reason.
 check(
   'duplicate tokens removed',
-  buildEmbeddingText({ title: 'Apple iPhone 15 Pro', brand: 'Apple' }),
-  'apple iphone 15 pro',
+  buildEmbeddingText({ title: 'Sony Bravia 55 inch', brand: 'Sony' }),
+  'sony bravia 55 inch',
 );
 
 check(
   'attributes appended with units',
   buildEmbeddingText({
-    title: 'Galaxy S24',
+    title: 'Samsung 55 inch TV',
     brand: 'Samsung',
-    attributes: { storage_gb: 512, ram_gb: 12, colour: 'titanium grey' },
+    category: 'TELEVISION',
+    attributes: { screen_in: 55, resolution: '4k', colour: 'titanium grey' },
   }),
-  'samsung galaxy s24 512 gb storage 12 ram titanium grey',
+  'samsung 55 inch tv television titanium grey',
 );
 
 // Fixed key order: two listings with the same attributes inserted in different
 // orders must produce byte-identical text, or they embed to different vectors.
 check(
   'attribute order is insertion-independent',
-  buildEmbeddingText({ title: 'X', attributes: { ram_gb: 8, storage_gb: 256 } }),
-  buildEmbeddingText({ title: 'X', attributes: { storage_gb: 256, ram_gb: 8 } }),
+  buildEmbeddingText({ title: 'X', category: 'TELEVISION', attributes: { screen_in: 55, resolution: '4k' } }),
+  buildEmbeddingText({ title: 'X', category: 'TELEVISION', attributes: { resolution: '4k', screen_in: 55 } }),
 );
 
 check(
   'case and punctuation normalised',
-  buildEmbeddingText({ title: 'APPLE iPhone 15 Pro (Natural Titanium, 256 GB)' }),
-  'apple iphone 15 pro natural titanium 256 gb',
+  buildEmbeddingText({ title: 'SONY Bravia (55 inch, 4K)' }),
+  'sony bravia 55 inch 4k',
 );
 check('OTHER category omitted', buildEmbeddingText({ title: 'Thing', category: 'OTHER' }), 'thing');
 
@@ -150,18 +151,18 @@ async function modelTests(): Promise<void> {
 
   const texts = [
     buildEmbeddingText({
-      title: 'Apple iPhone 15 Pro (256 GB) - Natural Titanium',
-      brand: 'Apple',
-      attributes: { storage_gb: 256 },
+      title: 'Sony Bravia 139 cm (55 inches) 4K Ultra HD Smart LED Google TV',
+      brand: 'Sony',
+      attributes: { screen_in: 55 },
     }),
     buildEmbeddingText({
-      title: 'APPLE iPhone 15 Pro (Natural Titanium, 256 GB)',
-      brand: 'APPLE',
-      attributes: { storage_gb: 256 },
+      title: 'SONY Bravia 139 cm (55 inch) Ultra HD (4K) LED Smart Google TV',
+      brand: 'SONY',
+      attributes: { screen_in: 55 },
     }),
     buildEmbeddingText({
-      title: 'Apple Silicone Case with MagSafe for iPhone 15 Pro',
-      brand: 'Apple',
+      title: 'Wall Mount Bracket for Sony Bravia 55 inch TV',
+      brand: 'Sony',
     }),
     buildEmbeddingText({
       title: 'LG 260 L 3 Star Frost Free Double Door Refrigerator',
@@ -182,22 +183,22 @@ async function modelTests(): Promise<void> {
   check('vectors are L2-normalised', Math.abs(magnitude - 1) < 0.01, true);
 
   const sameProduct = cosineSimilarity(results[0]!.vector, results[1]!.vector);
-  const phoneVsCase = cosineSimilarity(results[0]!.vector, results[2]!.vector);
-  const phoneVsFridge = cosineSimilarity(results[0]!.vector, results[3]!.vector);
+  const tvVsMount = cosineSimilarity(results[0]!.vector, results[2]!.vector);
+  const tvVsFridge = cosineSimilarity(results[0]!.vector, results[3]!.vector);
 
   console.log(`  load + embed 4 texts : ${elapsed}ms`);
   console.log(`  same product         : ${sameProduct.toFixed(4)}`);
-  console.log(`  phone vs its case    : ${phoneVsCase.toFixed(4)}`);
-  console.log(`  phone vs fridge      : ${phoneVsFridge.toFixed(4)}`);
+  console.log(`  tv vs its mount      : ${tvVsMount.toFixed(4)}`);
+  console.log(`  tv vs fridge         : ${tvVsFridge.toFixed(4)}`);
 
   check('same product scores very high', sameProduct > 0.9, true);
-  check('unrelated products score lower', phoneVsFridge < sameProduct, true);
-  check('phone/fridge clearly separated', phoneVsFridge < 0.8, true);
+  check('unrelated products score lower', tvVsFridge < sameProduct, true);
+  check('tv/fridge clearly separated', tvVsFridge < 0.8, true);
 
   // The point of the accessory veto: an embedding CANNOT be trusted to
-  // separate a phone from its own case, and this measures how close they are.
+  // separate a tv from its own mount, and this measures how close they are.
   console.log(
-    `  NOTE: phone vs case is ${phoneVsCase.toFixed(4)} — this is why the accessory veto exists`,
+    `  NOTE: tv vs mount is ${tvVsMount.toFixed(4)} — this is why the accessory veto exists`,
   );
 
   let threw = false;

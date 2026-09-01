@@ -95,9 +95,6 @@ enum Availability {
 /// Drives which attribute set and which veto rules the matching engine
 /// applies. Scope is electronics + appliances (Phase 1 decision).
 enum ProductCategory {
-  PHONE
-  LAPTOP
-  TABLET
   AUDIO
   TELEVISION
   REFRIGERATOR
@@ -180,6 +177,12 @@ model Product {
 
   imageUrl String?       @map("image_url") @db.VarChar(1024)
   status   ProductStatus @default(PENDING)
+
+  // --- Lifecycle & Priority (15K Active Tracking) ---
+  modelYear       Int?    @map("model_year")
+  priorityScore   Int     @default(0) @map("priority_score")
+  youtubeFeatured Boolean @default(false) @map("youtube_featured")
+  youtubeVideoId  String? @map("youtube_video_id") @db.VarChar(128)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)

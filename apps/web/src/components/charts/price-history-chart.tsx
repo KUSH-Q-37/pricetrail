@@ -205,6 +205,11 @@ export function PriceHistoryChart({
 
       series: shown.map((entry) => {
         const color = seriesColor(entry.platform, tokens);
+        
+        // ECharts hides the line if there's only 1 point. If we also hide the symbol, 
+        // the entire series becomes invisible. We must show the symbol if it's a lone point.
+        const observedCount = entry.points.filter(p => p[1] !== null).length;
+        
         return {
           name: PLATFORM_LABEL[entry.platform],
           type: 'line' as const,
@@ -212,7 +217,7 @@ export function PriceHistoryChart({
           // observation; connectNulls:true would draw a confident straight
           // line across a two-week outage and invent prices we never saw.
           connectNulls: false,
-          showSymbol: false,
+          showSymbol: observedCount === 1,
           // Hover target is generous even though symbols are hidden.
           symbolSize: 8,
           sampling: 'lttb' as const,

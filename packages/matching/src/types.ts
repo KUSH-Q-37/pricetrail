@@ -1,7 +1,4 @@
 export type ProductCategory =
-  | 'PHONE'
-  | 'LAPTOP'
-  | 'TABLET'
   | 'AUDIO'
   | 'TELEVISION'
   | 'REFRIGERATOR'

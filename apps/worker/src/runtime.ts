@@ -48,6 +48,7 @@ import {
 import { discoverCounterpart } from './jobs/discover-counterpart';
 import { reclassifyCatalogue } from './jobs/reclassify-catalogue';
 import { retireStaleTracking } from './jobs/retire-stale-tracking';
+import { runYearlyRollover } from './jobs/yearly-rollover';
 import { embedMissingListings } from './jobs/embed-listings';
 import { planDailySweep } from './jobs/daily-sweep';
 import { matchListing } from './jobs/match-listings';
@@ -438,6 +439,12 @@ export async function startWorkerRuntime(
             return result;
           }
 
+          case 'yearly-rollover': {
+            const result = await runYearlyRollover(prisma);
+            logger.info('yearly rollover applied', { ...result });
+            return result;
+          }
+
           default:
             throw new Error(`Unknown maintenance task: ${String(job.data.task)}`);
         }
@@ -511,6 +518,14 @@ export async function startWorkerRuntime(
       QUEUE.maintenance,
       { task: 'retire-tracking' },
       { pattern: '58 13 * * 0', jobId: 'repeat-retire-tracking' },
+    );
+
+    // Yearly rollover to maintain the 15K tracking window.
+    // Scheduled at 02:00 on Jan 1st (inside the 01:45 keepalive window)
+    await producer.schedule(
+      QUEUE.maintenance,
+      { task: 'yearly-rollover' },
+      { pattern: '0 2 1 1 *', jobId: 'repeat-yearly-rollover' },
     );
 
     // Once, now, in addition to the schedule below.

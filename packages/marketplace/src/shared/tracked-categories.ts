@@ -48,11 +48,7 @@ export function normalizeCategorySlug(slug: string): string {
  */
 export const TRACKED_CATEGORY_SLUGS: ReadonlySet<string> = new Set([
   // --- electronics ---------------------------------------------------------
-  'mobile',
-  'computer',
-  'tablet',
   'television',
-  'monitor',
   'printer',
   'gamingconsole',
   'camera',
@@ -135,6 +131,10 @@ const FLIPKART_EXCLUDED: ReadonlySet<string> = new Set([
   'diary_notebook',
   'musical_toy',
   'backpack',
+  'mobile',
+  'computer',
+  'tablet',
+  'monitor',
 ]);
 
 /**
@@ -187,6 +187,12 @@ const AMAZON_EXCLUDED: ReadonlySet<string> = new Set([
   'furniture',
   'art and craft supply',
   'office product',
+  'smartphone',
+  'mobile',
+  'computer',
+  'laptop',
+  'tablet',
+  'monitor',
 ]);
 
 /**

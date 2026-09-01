@@ -18,6 +18,7 @@ export interface NormalizedAttributes {
   capacity_ton?: number;
   star_rating?: number;
   model_number?: string;
+  model_year?: number;
   [key: string]: string | number | undefined;
 }
 
@@ -194,6 +195,11 @@ export function normalizeAttributes(
     if (/^(model|model_number|item_model_number|model_name)$/.test(normalizedKey)) {
       const model = cleanText(value);
       if (model && model.length <= 120) result.model_number = model;
+    }
+
+    if (/^(model_year|year_of_release|launch_year|year|release_year)$/.test(normalizedKey)) {
+      const match = /\b(20[1-3][0-9])\b/.exec(cleanText(value));
+      if (match?.[1]) result.model_year = Number(match[1]);
     }
   }
 

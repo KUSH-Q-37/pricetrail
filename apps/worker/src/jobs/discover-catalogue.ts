@@ -83,17 +83,13 @@ export interface DiscoverCatalogueResult {
  * Adding a category here does not enlarge the catalogue, it reallocates it.
  *
  * Broad category words rather than specific models: a generic term returns a
- * spread of brands and price points, where "iphone 15" would return forty
+ * spread of brands and price points, where "sony bravia 55 inch" would return forty
  * near-identical listings and teach the matcher nothing.
  */
 export const DEFAULT_DISCOVERY_SEEDS = [
   // --- electronics ---------------------------------------------------------
-  'smartphone',
-  'laptop',
-  'tablet',
   'television',
   'camera',
-  'monitor',
   'printer',
   'gaming console',
 
@@ -173,8 +169,8 @@ export async function discoverCatalogue(
   let budget = maxListings - trackedBefore;
 
   // Seeds are walked breadth-first — page 1 of every seed, then page 2 of
-  // every seed. Depth-first would spend the entire budget on smartphones
-  // before reaching televisions, and a run that is interrupted (deploy,
+  // every seed. Depth-first would spend the entire budget on televisions
+  // before reaching cameras, and a run that is interrupted (deploy,
   // restart, cap) would leave the catalogue lopsided.
   outer: for (let page = 1; page <= pagesPerSeed; page += 1) {
     for (const seed of seeds) {

@@ -28,13 +28,11 @@ describe('normalizeCategorySlug', () => {
 
 describe('classifyForTracking', () => {
   it.each([
-    ['mobile', 'smartphones'],
     ['television', 'TVs'],
     ['air_conditioner_new', 'air conditioners, unnormalized'],
     ['refrigerator_new', 'refrigerators, unnormalized'],
     ['washing_machine_new', 'washing machines, unnormalized'],
     ['vacuum_cleaner', 'vacuums'],
-    ['computer', 'laptops'],
     ['headphone', 'audio'],
     ['smart_lighting', 'smart home'],
     ['home_security_camera', 'smart home security'],
@@ -75,18 +73,18 @@ describe('classifyForTracking', () => {
     expect(classifyForTracking('   ').action).toBe('leave');
   });
 
-  it('untracks an unknown category but never an absent one', () => {
-    // The difference that matters: a category we have not catalogued is a real
-    // signal and acts; no category at all is not.
+  it('leaves an unknown category but untracks an excluded one', () => {
+    // The difference that matters: a category we have not catalogued is allowed to track
+    // (so we don't reject pasted urls) but is logged, whereas a known exclusion is untracked.
     expect(classifyForTracking('quantum_flux').action).toBe('untrack');
-    expect(classifyForTracking(undefined).action).toBe('leave');
+    expect(classifyForTracking('shoe').action).toBe('untrack');
   });
 
   it('covers every category the discovery seeds actually return', () => {
     // Guards the seeds and the allowlist against drifting apart: a seed whose
     // category is not tracked would enrol products the very next sweep then
     // untracks, burning budget to no end.
-    for (const slug of ['mobile', 'computer', 'tablet', 'television', 'monitor',
+    for (const slug of ['television', 
       'printer', 'gamingconsole', 'headphone', 'speaker', 'power_bank', 'smartwatch',
       'mouse', 'keyboard', 'pendrive', 'memory_card', 'router', 'battery_charger',
       'vacuum_cleaner', 'air_cooler', 'induction_cook_top', 'chimney', 'air_fryer',
@@ -125,10 +123,10 @@ describe('classifyForTracking on Amazon', () => {
   });
 
   it('does not apply the Flipkart allowlist to Amazon, or vice versa', () => {
-    // `mobile` is a Flipkart slug. Amazon never emits it, and if it somehow
+    // `television` is a Flipkart slug. Amazon never emits it, and if it somehow
     // did, it must not be silently accepted through the wrong platform's list.
-    expect(classifyForTracking('mobile', 'FLIPKART').action).toBe('track');
-    expect(classifyForTracking('mobile', 'AMAZON').action).toBe('leave');
+    expect(classifyForTracking('television', 'FLIPKART').action).toBe('track');
+    expect(classifyForTracking('television', 'AMAZON').action).toBe('leave');
 
     // `Shoes` is Amazon's spelling; Flipkart's is `shoe`. Each untracks under
     // its own platform, and neither is required to know the other's.

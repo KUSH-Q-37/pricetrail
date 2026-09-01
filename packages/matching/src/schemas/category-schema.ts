@@ -43,30 +43,6 @@ export interface CategorySchema {
  * matches. It contributes to the score and nothing more.
  */
 const SCHEMAS: Record<ProductCategory, AttributeDefinition[]> = {
-  PHONE: [
-    // Capacity variants are the classic false-positive. Both veto.
-    { key: 'storage_gb', veto: true, weight: 0.35 },
-    { key: 'ram_gb', veto: true, weight: 0.3 },
-    { key: 'colour', veto: false, weight: 0.2 },
-    { key: 'screen_in', veto: false, weight: 0.15, tolerance: 0.15 },
-  ],
-
-  TABLET: [
-    { key: 'storage_gb', veto: true, weight: 0.35 },
-    { key: 'ram_gb', veto: true, weight: 0.25 },
-    { key: 'screen_in', veto: true, weight: 0.25, tolerance: 0.2 },
-    { key: 'colour', veto: false, weight: 0.15 },
-  ],
-
-  LAPTOP: [
-    { key: 'ram_gb', veto: true, weight: 0.3 },
-    { key: 'storage_gb', veto: true, weight: 0.3 },
-    // Screen size defines the SKU on laptops (13" vs 15" are different
-    // products), so unlike phones it vetoes.
-    { key: 'screen_in', veto: true, weight: 0.25, tolerance: 0.2 },
-    { key: 'colour', veto: false, weight: 0.15 },
-  ],
-
   AUDIO: [
     { key: 'colour', veto: false, weight: 0.5 },
     { key: 'form_factor', veto: false, weight: 0.5 },

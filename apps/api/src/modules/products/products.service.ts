@@ -275,9 +275,9 @@ export class ProductsService {
               url: parsed.canonicalUrl,
               title: placeholder,
               normalizedTitle: placeholder.toLowerCase(),
-              // Tracking is enabled immediately so the daily sweep picks it up
-              // as soon as the fetchers exist.
-              trackingEnabled: true,
+              // Start false. The Lifecycle Manager will evaluate and activate 
+              // it once attributes (like model year) are scraped.
+              trackingEnabled: false,
             },
           },
         },
