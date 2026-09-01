@@ -1,5 +1,6 @@
-import { isYearEligible, calculatePriorityScore } from './lifecycle-manager';
+import { isYearEligible, calculatePriorityScore } from '../src/jobs/lifecycle-manager';
 import { ProductCategory } from '@pricetrail/database';
+// @ts-ignore
 import { describe, it, expect } from 'vitest';
 
 describe('Lifecycle Manager', () => {
