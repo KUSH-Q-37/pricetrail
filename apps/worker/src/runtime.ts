@@ -616,7 +616,7 @@ export async function startWorkerRuntime(
       await producer.schedule(
         QUEUE.maintenance,
         { task: 'discover-amazon-catalogue' },
-        { pattern: '5 8,14,20 * * *', jobId: 'repeat-discover-amazon-catalogue' },
+        { pattern: '45 7,13,19 * * *', jobId: 'repeat-discover-amazon-catalogue' },
       );
     }
   }
