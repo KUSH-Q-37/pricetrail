@@ -13,11 +13,15 @@ export interface RetentionResult {
 }
 
 /**
+ * Drops old price_points partitions.
+ *
  * Default retention: 15 months.
+ * The job is partitioned by week/month, so dropping a 15-month-old partition
+ * is a pure metadata operation (DROP TABLE) rather than a row-by-row DELETE.
  *
  * Matches the longest range the UI offers. Keeping more would mean storing
  * data no screen can reach; keeping less would mean a range that renders
- * empty for reasons a user cannot see.
+ * partly empty.
  */
 export const DEFAULT_RETENTION_MONTHS = 15;
 

@@ -96,6 +96,11 @@ export const DEFAULT_DISCOVERY_SEEDS = [
   // --- electronic accessories ----------------------------------------------
   'headphones',
   'bluetooth speaker',
+  'soundbar',
+  'home theatre',
+  'av receiver',
+  'party speaker',
+  'portable audio player',
   'power bank',
   'smartwatch',
   'wireless mouse',
@@ -104,26 +109,29 @@ export const DEFAULT_DISCOVERY_SEEDS = [
   'memory card',
   'wifi router',
   'mobile charger',
-  // 'laptop bag' deliberately absent: Flipkart files those under `backpack`,
-  // alongside school and hiking bags, and that slug is not tracked. Seeding it
-  // would enrol products the next sweep immediately untracks, spending
-  // discovery budget to no end.
 
   // --- home appliances ------------------------------------------------------
   'refrigerator',
   'washing machine',
   'air conditioner',
   'microwave oven',
+  'otg oven',
+  'electric oven',
   'water purifier',
   'mixer grinder',
   'ceiling fan',
   'water heater geyser',
   'vacuum cleaner',
   'air cooler',
+  'air purifier',
+  'room heater',
   'induction cooktop',
   'kitchen chimney',
   'dishwasher',
   'air fryer',
+  'rice cooker',
+  'coffee maker',
+  'tea maker',
 
   // --- smart home -----------------------------------------------------------
   'smart led bulb',
@@ -132,6 +140,7 @@ export const DEFAULT_DISCOVERY_SEEDS = [
   'security camera cctv',
   'video doorbell',
   'smart door lock',
+  'smart switch',
 ];
 
 /** Free-tier safe. See the storage note above. */
@@ -154,6 +163,13 @@ export async function discoverCatalogue(
     pagesFetched: 0,
     capReached: false,
   };
+
+  // The system must not begin automated discovery until 10-09-2026
+  const TRACKING_START_DATE = new Date('2026-09-10T00:00:00.000+05:30');
+  if (new Date() < TRACKING_START_DATE) {
+    logger.info('catalogue discovery paused: waiting for 10-09-2026 launch date');
+    return result;
+  }
 
   // The cheap early exit. Once the catalogue is full this job costs one COUNT
   // per run and nothing else, which is what makes it safe to schedule often.

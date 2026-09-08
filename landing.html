@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PriceTrail - Is that discount real?</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&amp;family=Hanken+Grotesk:wght@400;500;600;700&amp;family=Space+Grotesk:wght@700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                "error": "#ba1a1a",
+                "surface-variant": "#dae2fd",
+                "on-secondary-fixed": "#40000d",
+                "secondary-fixed": "#ffdadb",
+                "on-primary": "#ffffff",
+                "tertiary-container": "#996100",
+                "surface-container-high": "#e2e7ff",
+                "tertiary-fixed": "#ffddb8",
+                "surface-container": "#eaedff",
+                "error-container": "#ffdad6",
+                "outline-variant": "#c3c6d7",
+                "tertiary-fixed-dim": "#ffb95f",
+                "on-primary-fixed": "#00174b",
+                "surface-container-low": "#f2f3ff",
+                "surface-dim": "#d2d9f4",
+                "tertiary": "#784b00",
+                "inverse-primary": "#b4c5ff",
+                "on-surface-variant": "#434655",
+                "primary": "#004ac6",
+                "surface-container-lowest": "#ffffff",
+                "secondary-container": "#dc2c4f",
+                "on-background": "#131b2e",
+                "on-secondary-fixed-variant": "#92002a",
+                "on-surface": "#131b2e",
+                "inverse-surface": "#283044",
+                "surface-bright": "#faf8ff",
+                "on-primary-container": "#eeefff",
+                "primary-fixed": "#dbe1ff",
+                "surface-container-highest": "#dae2fd",
+                "on-tertiary": "#ffffff",
+                "outline": "#737686",
+                "secondary-fixed-dim": "#ffb2b7",
+                "surface-tint": "#0053db",
+                "on-tertiary-fixed": "#2a1700",
+                "primary-fixed-dim": "#b4c5ff",
+                "on-error": "#ffffff",
+                "surface": "#faf8ff",
+                "on-secondary-container": "#fffbff",
+                "primary-container": "#2563eb",
+                "on-tertiary-fixed-variant": "#653e00",
+                "secondary": "#b90538",
+                "on-tertiary-container": "#ffeedd",
+                "on-error-container": "#93000a",
+                "on-secondary": "#ffffff",
+                "background": "#faf8ff",
+                "on-primary-fixed-variant": "#003ea8",
+                "inverse-on-surface": "#eef0ff"
+              },
+              "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+              },
+              "spacing": {
+                "container-max": "1280px",
+                "stack-md": "24px",
+                "stack-lg": "48px",
+                "unit": "8px",
+                "margin-mobile": "20px",
+                "margin-desktop": "40px",
+                "gutter": "24px",
+                "stack-sm": "12px"
+              },
+              "fontFamily": {
+                "display-lg": [
+                  "Sora"
+                ],
+                "body-lg": [
+                  "Hanken Grotesk"
+                ],
+                "label-caps": [
+                  "Space Grotesk"
+                ],
+                "price-display": [
+                  "Sora"
+                ],
+                "headline-md": [
+                  "Sora"
+                ],
+                "body-md": [
+                  "Hanken Grotesk"
+                ],
+                "display-lg-mobile": [
+                  "Sora"
+                ],
+                "headline-sm": [
+                  "Sora"
+                ]
+              },
+              "fontSize": {
+                "display-lg": [
+                  "48px",
+                  {
+                    "lineHeight": "1.1",
+                    "letterSpacing": "-0.02em",
+                    "fontWeight": "800"
+                  }
+                ],
+                "body-lg": [
+                  "18px",
+                  {
+                    "lineHeight": "1.6",
+                    "fontWeight": "400"
+                  }
+                ],
+                "label-caps": [
+                  "12px",
+                  {
+                    "lineHeight": "1",
+                    "letterSpacing": "0.1em",
+                    "fontWeight": "700"
+                  }
+                ],
+                "price-display": [
+                  "20px",
+                  {
+                    "lineHeight": "1",
+                    "letterSpacing": "-0.01em",
+                    "fontWeight": "700"
+                  }
+                ],
+                "headline-md": [
+                  "32px",
+                  {
+                    "lineHeight": "1.2",
+                    "fontWeight": "700"
+                  }
+                ],
+                "body-md": [
+                  "16px",
+                  {
+                    "lineHeight": "1.6",
+                    "fontWeight": "400"
+                  }
+                ],
+                "display-lg-mobile": [
+                  "36px",
+                  {
+                    "lineHeight": "1.1",
+                    "letterSpacing": "-0.02em",
+                    "fontWeight": "800"
+                  }
+                ],
+                "headline-sm": [
+                  "24px",
+                  {
+                    "lineHeight": "1.3",
+                    "fontWeight": "600"
+                  }
+                ]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        .ambient-shadow-sm { box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08); }
+        .ambient-shadow-md { box-shadow: 0 8px 20px rgba(37, 99, 235, 0.12); }
+        .ambient-shadow-lg { box-shadow: 0 16px 40px rgba(37, 99, 235, 0.15); }
+        .gradient-text {
+            background: linear-gradient(90deg, #004ac6, #dc2c4f);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .hero-pattern {
+            background-image: radial-gradient(#dae2fd 2px, transparent 2px);
+            background-size: 24px 24px;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md antialiased overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopNav Component -->
+<nav class="sticky top-0 z-50 bg-surface/80 backdrop-blur-md shadow-sm w-full">
+<div class="flex justify-between items-center px-margin-mobile md:px-margin-desktop py-4 w-full max-w-container-max mx-auto">
+<a class="font-display-lg text-headline-sm font-extrabold text-primary tracking-tighter" href="#">
+                PriceTrail
+            </a>
+<div class="hidden md:flex items-center space-x-8">
+<a class="text-on-surface-variant font-medium hover:text-primary transition-colors" href="#">Dashboard</a>
+<a class="text-on-surface-variant font-medium hover:text-primary transition-colors" href="#">Watchlist</a>
+<a class="text-on-surface-variant font-medium hover:text-primary transition-colors" href="#">Alerts</a>
+<a class="text-on-surface-variant font-medium hover:text-primary transition-colors" href="#">Trends</a>
+</div>
+<div class="flex items-center space-x-4">
+<a class="hidden sm:block text-on-surface-variant font-medium hover:text-primary transition-colors" href="#">Login</a>
+<button class="bg-primary text-on-primary font-bold py-2 px-6 rounded-lg hover:bg-primary-fixed-variant transition-colors ambient-shadow-sm hover:scale-105 active:scale-95">
+                    Get Started
+                </button>
+</div>
+</div>
+</nav>
+<!-- Hero Section -->
+<header class="relative pt-24 pb-32 px-margin-mobile md:px-margin-desktop hero-pattern overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-b from-surface-bright/50 to-background pointer-events-none"></div>
+<div class="relative z-10 max-w-container-max mx-auto text-center flex flex-col items-center">
+<div class="inline-flex items-center space-x-2 bg-secondary-fixed/50 text-on-secondary-fixed px-4 py-2 rounded-full font-label-caps text-label-caps mb-8 ambient-shadow-sm border border-secondary/20">
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+<span>Track 50M+ Products Daily</span>
+</div>
+<h1 class="font-display-lg-mobile text-display-lg-mobile md:font-display-lg md:text-display-lg max-w-4xl mx-auto mb-6 text-on-background">
+<span class="block">Is that discount</span>
+<span class="gradient-text italic">really a discount?</span>
+</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto mb-12">
+                Stop falling for fake sales. PriceTrail exposes true price history across major retailers so you never overpay again.
+            </p>
+<div class="w-full max-w-3xl relative ambient-shadow-lg rounded-xl overflow-hidden group">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-outline text-2xl">search</span>
+</div>
+<input class="w-full bg-surface-container-lowest text-on-surface pl-12 pr-32 py-5 rounded-xl border-2 border-outline-variant focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all font-body-lg outline-none placeholder:text-outline/70" placeholder="Paste a product URL or search by name..." type="text"/>
+<button class="absolute inset-y-2 right-2 bg-primary text-on-primary px-6 rounded-lg font-bold hover:bg-primary-fixed-variant transition-colors">
+                    Track Price
+                </button>
+</div>
+<div class="mt-12 flex items-center space-x-6 text-outline font-label-caps text-label-caps">
+<span>SUPPORTED RETAILERS</span>
+<img alt="Amazon Logo" class="h-6 w-auto opacity-70 grayscale hover:grayscale-0 transition-all cursor-pointer" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDEZv4qurP8kFxuRFHsAkBCJJntNgomrvNP0z9idWK5u2ZxlytP4T26rYmDoEu4-Nh4vmX2EInlzErytaax5msyHLfxwKzfNhQVSbAs7ZFeSEyjq944SLdvlaNb2k9j46zA1aCvxBCQpO6lTv1NGohzTWomj_tsV6DMvjlUgpckgz70Ho0jh_b0Itw8ofUxyZ_aMWkhM2Ct76ngQfnefxgCEeMCoHhDn2CZ1c-zbcjoXPXE8TsLwqr9t3cEPfErjDjRbdVRV9y8udo"/>
+<img alt="Flipkart Logo" class="h-6 w-auto opacity-70 grayscale hover:grayscale-0 transition-all cursor-pointer" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA9XUUneVir5itAh2V5LmX0F_3Y-wEqehoGuq5SgbBsqDIU7hrJQrvZQcSWykGwANO75V08juTx85CoFLZcXgnD8jiESf3_zHVPNSTDulah4OZF5XUkuCWotvub6HJC96EAulyEchrCKFZnA4XjSmJCFQ2nX3RTEktgfl-kSmHrqp-gbkIWcdykZqJ_jyvNK5yqhFl2Lay130wZL9KY5WRzMC2x8sFikO4Exn85ku5eG4_jKEUSwGgjhjBNQe4f_wbOBiRmsnrkEpo"/>
+</div>
+</div>
+</header>
+<!-- Features Bento Grid -->
+<section class="py-stack-lg px-margin-mobile md:px-margin-desktop bg-surface-container-low">
+<div class="max-w-container-max mx-auto">
+<h2 class="font-headline-md text-headline-md text-on-surface mb-stack-md text-center">Uncover the Truth in Data</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<!-- Feature 1 -->
+<div class="bg-surface rounded-xl p-stack-md ambient-shadow-md border border-surface-variant hover:-translate-y-1 transition-transform duration-300">
+<div class="h-12 w-12 rounded-lg bg-primary-container/20 flex items-center justify-center mb-6">
+<img alt="Daily Price Tracking Icon" class="h-8 w-8 object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1VAntZkA7aBYZ3UKPXHZn0Uc-kIXGVLERhzu_GT9rMO_voulygBpzm9Xd6Hdci26v9Ti32vTuRiAaYuTTQWn4UaDJiKZQ9hWU7RLfGCTnC42sUcbYqUz5gIGj5All23FV2PCF9_xKVXibxb_3j6R5p5fWEqdvADXb2f1NvBqoiTYrwBN6EL-GHPMNBVxuhPsKMlOu1xsuoTC1BGtZAQc08eiuYyLVy2lVXwy7iv8ukY1XzuLCB4Cb2BQ1c"/>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-2">Daily Tracking</h3>
+<p class="text-on-surface-variant">We monitor millions of products every single day, ensuring you catch fleeting price drops the moment they happen.</p>
+</div>
+<!-- Feature 2 -->
+<div class="bg-surface rounded-xl p-stack-md ambient-shadow-md border border-surface-variant hover:-translate-y-1 transition-transform duration-300">
+<div class="h-12 w-12 rounded-lg bg-secondary-container/20 flex items-center justify-center mb-6">
+<img alt="History Icon" class="h-8 w-8 object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WqcFGaBVITYuct0QoQAZWSbRchOhd34yutC4XQvT0v4OGPniRypfo4BUn7JXirccmb7Pp7XT5p6XClsBqnVZCwfJ086YjeZWeeIPASUbm1r-MXdNixGrlwgcHBJwkXf1yldXOk_KWH3aqZR2q1ZEnZkfMdBs9WOtoejrzfkn7RLfAGAx7KM-PkYZ4kt1a-MU3kN-hPxof5M73Y3Z_8WTmYvQ8j4u76nAQe9wUJ3cwLxzeWHhJuHd7LoA"/>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-2">15-Month History</h3>
+<p class="text-on-surface-variant">Look back over a year to spot seasonal trends, fake holiday markups, and truly historical low prices.</p>
+</div>
+<!-- Feature 3 -->
+<div class="bg-surface rounded-xl p-stack-md ambient-shadow-md border border-surface-variant hover:-translate-y-1 transition-transform duration-300">
+<div class="h-12 w-12 rounded-lg bg-tertiary-container/20 flex items-center justify-center mb-6">
+<img alt="Data Integrity Icon" class="h-8 w-8 object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1Ug6SA3rrPc8elzpEDQeeSx1z0yhTNxktX8zo85Jc5RF0k18kUAJFBeyk9B_bmmN_EQkqBYx_OTGDr9rrdubzfMzYOjJi-RgKV1MaxU3KaXene0CK1BNnYyDvDObnHgG9Ur-g8u3B_LqBWKyqVg6FOXJazi-fYLkMIpe3LlAUwxmvIgoj9a0rHF-8CVb-Bvxi8X8dXegh4yCrNyK1Km9JqSCmEWOP9xSnhAAuPL3ftEVqQxuR5Oys4IeA"/>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-2">Gaps Stay Gaps</h3>
+<p class="text-on-surface-variant">We don't interpolate missing data. If a product goes out of stock or untrackable, the gap reflects reality.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Product Showcase -->
+<section class="py-stack-lg px-margin-mobile md:px-margin-desktop bg-background">
+<div class="max-w-container-max mx-auto">
+<h2 class="font-headline-md text-headline-md text-on-surface mb-stack-md">Live Price Drops</h2>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-gutter">
+<!-- Product Card 1 -->
+<div class="bg-surface rounded-xl flex flex-col sm:flex-row overflow-hidden ambient-shadow-md border border-surface-variant">
+<div class="w-full sm:w-2/5 bg-surface-container-high h-64 sm:h-auto relative">
+<img class="w-full h-full object-cover absolute inset-0" data-alt="A sleek, modern pair of premium noise-canceling headphones resting on a minimalist concrete desk. The lighting is moody and cinematic, with soft blue and teal highlights emphasizing the metallic finish of the earcups. In the background, out-of-focus screens display vibrant data charts and graphs, suggesting a high-tech, analytical environment. The overall aesthetic is sophisticated, professional, and slightly futuristic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAm4sEx3fo8cYbvvYFkHN_75PBrhoStGDPS1wnPfOrOk2amEra2fvFR5xxqN_HiPaV9UMzvbqPfAD1S8XumYURQqSgrqZB14vdYq_4NbERsoZc2kpXi0-ASZaGVHYzhYN367a00wIJzdAkfa8wE2I5gXuhPD32HQh754gf_7pSUzho_1UFyTpOAJiRmWTeXWYEYAjAh6t8nOTZVv1R39f5gEr90_cwhV8Cbh2h5K11A57_2i4BpTOLzlvjKFElMyC014R2jmfgKNcw"/>
+<div class="absolute top-4 left-4 bg-secondary text-on-secondary font-label-caps text-label-caps px-2 py-1 rounded">PRICE DROP</div>
+</div>
+<div class="p-6 flex-1 flex flex-col justify-between">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-1">Aura Flow Pro Headphones</h3>
+<p class="text-outline text-sm mb-4">Amazon Electronics</p>
+<div class="flex items-end space-x-3 mb-6">
+<span class="font-price-display text-headline-md font-bold text-primary">$199.00</span>
+<span class="text-outline-variant line-through mb-1">$299.00</span>
+<span class="text-secondary font-bold mb-1">-33%</span>
+</div>
+</div>
+<div class="h-16 w-full rounded bg-surface-container-lowest border border-surface-container flex items-end p-1 relative overflow-hidden">
+<!-- Faux sparkline -->
+<svg class="absolute bottom-0 w-full h-12 text-secondary" fill="none" preserveaspectratio="none" stroke="currentColor" stroke-width="2" viewbox="0 0 100 100">
+<path d="M0,80 L20,75 L40,85 L60,40 L80,50 L100,10"></path>
+<path d="M0,80 L20,75 L40,85 L60,40 L80,50 L100,10 L100,100 L0,100 Z" fill="currentColor" fill-opacity="0.1" stroke="none"></path>
+</svg>
+</div>
+</div>
+</div>
+<!-- Product Card 2 -->
+<div class="bg-surface rounded-xl flex flex-col sm:flex-row overflow-hidden ambient-shadow-md border border-surface-variant">
+<div class="w-full sm:w-2/5 bg-surface-container-high h-64 sm:h-auto relative">
+<img class="w-full h-full object-cover absolute inset-0" data-alt="A pristine white, modern smart air conditioner unit mounted on a vibrant teal blue wall. The air conditioner has a sleek, minimalist design with a subtle LED temperature display reading 22 degrees. A small, contemporary potted plant sits in the blurred background, adding a touch of organic warmth to the crisp, clean setting. The lighting is bright and even, highlighting the clean lines of the appliance." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA852mx-sxNe95NbrjxSGU-whM7FDwFLsCbabF7uTKM3F4TIk5rgmXZzeTaGQQ663AHHmC0UvbsMEE28OFdrvsDYOAXCGvkL3XsPHK6fbVKErbt0iILjsNsV6MLuJbsd9SrSVYNBprIxxfj2_RsGTd8MBh5M5uJ3rX3RMn6yn7ZgPlzadUxZNQGhAdp8IUh649Q6h_lo4o8yn63QOH-MSlwfhtg0Lm8ZY-WDmALTMZWydnqVwqSPQgXwkpgp3GC4jAjSQ6Vb7sqODQ"/>
+</div>
+<div class="p-6 flex-1 flex flex-col justify-between">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-1">BreezeMax Smart AC</h3>
+<p class="text-outline text-sm mb-4">Flipkart Home</p>
+<div class="flex items-end space-x-3 mb-6">
+<span class="font-price-display text-headline-md font-bold text-primary">$349.99</span>
+<span class="text-outline-variant line-through mb-1">$450.00</span>
+<span class="text-primary-container font-bold mb-1">Lowest in 30d</span>
+</div>
+</div>
+<div class="h-16 w-full rounded bg-surface-container-lowest border border-surface-container flex items-end p-1 relative overflow-hidden">
+<!-- Faux sparkline -->
+<svg class="absolute bottom-0 w-full h-12 text-primary" fill="none" preserveaspectratio="none" stroke="currentColor" stroke-width="2" viewbox="0 0 100 100">
+<path d="M0,50 L20,55 L40,45 L60,60 L80,70 L100,20"></path>
+<path d="M0,50 L20,55 L40,45 L60,60 L80,70 L100,20 L100,100 L0,100 Z" fill="currentColor" fill-opacity="0.1" stroke="none"></path>
+</svg>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Footer Component -->
+<footer class="bg-surface-container-highest w-full mt-12">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-gutter px-margin-mobile md:px-margin-desktop py-stack-lg w-full max-w-container-max mx-auto">
+<div class="col-span-1 md:col-span-1">
+<div class="font-headline-sm text-headline-sm font-bold text-primary mb-4">
+                    PriceTrail
+                </div>
+<p class="text-on-surface-variant text-sm mb-4">High-Performance Price Tracking.</p>
+<p class="text-on-surface-variant text-sm">© 2024 PriceTrail.</p>
+</div>
+<div class="col-span-1 md:col-span-3 flex flex-wrap gap-x-8 gap-y-4 md:justify-end">
+<a class="text-on-surface-variant hover:text-secondary transition-colors hover:underline cursor-pointer" href="#">Features</a>
+<a class="text-on-surface-variant hover:text-secondary transition-colors hover:underline cursor-pointer" href="#">API Reference</a>
+<a class="text-on-surface-variant hover:text-secondary transition-colors hover:underline cursor-pointer" href="#">Success Stories</a>
+<a class="text-on-surface-variant hover:text-secondary transition-colors hover:underline cursor-pointer" href="#">Privacy Policy</a>
+<a class="text-on-surface-variant hover:text-secondary transition-colors hover:underline cursor-pointer" href="#">Terms of Service</a>
+</div>
+</div>
+</footer>
+</body></html>

@@ -103,6 +103,15 @@ export const envSchema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
 
+  /**
+   * A shared secret that the frontend sends in the `x-api-key` header.
+   *
+   * When set, every non-health endpoint rejects requests without a matching
+   * key. When empty (the default), the API stays open — which is correct for
+   * local development and wrong for production.
+   */
+  API_SECRET_KEY: z.string().default(''),
+
 });
 
 export type Env = z.infer<typeof envSchema>;

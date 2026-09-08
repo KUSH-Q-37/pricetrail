@@ -409,6 +409,25 @@ export async function startWorkerRuntime(
             return result;
           }
 
+          case 'discover-amazon-catalogue': {
+            // Native Amazon discovery via Creators API.
+            // Safe, fast, and brings perfect ReleaseDate tags for the 15K pool.
+            
+            const result = await discoverCatalogue({
+              prisma,
+              search: adapters.AMAZON,
+              seeds: discoverySeeds(),
+              maxListings: Number(
+                process.env['DISCOVERY_MAX_LISTINGS'] ?? DEFAULT_MAX_TRACKED_LISTINGS,
+              ),
+              pagesPerSeed: 5, // Amazon API limits are stricter than Flipkart HTTP pages
+              pageDelayMs: 2500, // 2.5s between seeds to respect rate limits
+              logger,
+            });
+
+            return result;
+          }
+
           case 'reclassify-catalogue': {
             // Applies scope to listings already here. The scope gate in
             // scrape-listing only fires on fetch, so without this an allowlist
@@ -520,12 +539,12 @@ export async function startWorkerRuntime(
       { pattern: '58 13 * * 0', jobId: 'repeat-retire-tracking' },
     );
 
-    // Yearly rollover to maintain the 15K tracking window.
-    // Scheduled at 02:00 on Jan 1st (inside the 01:45 keepalive window)
+    // Periodic rollover to maintain the 15K tracking window (4-month cycle).
+    // Scheduled at 02:00 on the 1st of Jan, May, and Sep (inside the 01:45 keepalive window)
     await producer.schedule(
       QUEUE.maintenance,
       { task: 'yearly-rollover' },
-      { pattern: '0 2 1 1 *', jobId: 'repeat-yearly-rollover' },
+      { pattern: '0 2 1 1,5,9 *', jobId: 'repeat-yearly-rollover' },
     );
 
     // Once, now, in addition to the schedule below.
@@ -591,6 +610,13 @@ export async function startWorkerRuntime(
         QUEUE.maintenance,
         { task: 'discover-catalogue' },
         { pattern: '55 7,13,19 * * *', jobId: 'repeat-discover-catalogue' },
+      );
+
+      // Amazon Creators API discovery. Offset by 10 minutes from Flipkart to avoid concurrency spikes.
+      await producer.schedule(
+        QUEUE.maintenance,
+        { task: 'discover-amazon-catalogue' },
+        { pattern: '5 8,14,20 * * *', jobId: 'repeat-discover-amazon-catalogue' },
       );
     }
   }

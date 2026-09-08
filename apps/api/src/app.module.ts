@@ -4,6 +4,7 @@ import { LoggerModule } from 'nestjs-pino';
 
 import { RequestContextStore } from './common/context/request-context';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { ApiKeyGuard } from './common/guards/api-key.guard';
 import { RateLimitGuard } from './common/rate-limit/rate-limit.guard';
 import { AppConfigService } from './config/app-config.service';
 import { AppConfigModule } from './config/config.module';
@@ -85,13 +86,9 @@ import { ProductsModule } from './modules/products/products.module';
     // participates in DI and can inject the logger.
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
 
-    // The only guard left. There is no sign-in, so there is no identity to
-    // authenticate and nothing to authorise against — every route is public
-    // and rate limiting buckets by IP for everyone.
-    //
-    // That makes this guard the ONLY thing standing between the internet and
-    // POST /products/ingest, which enrols a product in daily fetching forever.
-    // Its limits are the abuse budget now, not a politeness measure.
+    // Guards run in registration order. The API key check is first: a rejected
+    // request should not increment the rate-limit counter.
+    { provide: APP_GUARD, useClass: ApiKeyGuard },
     { provide: APP_GUARD, useClass: RateLimitGuard },
   ],
 })

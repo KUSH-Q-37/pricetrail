@@ -74,6 +74,7 @@ export type MaintenanceTask =
   | 'retire-tracking'
   /** Enrols products nobody has searched, so the catalogue grows on its own. */
   | 'discover-catalogue'
+  | 'discover-amazon-catalogue'
   /** Applies tracking scope to listings already in the catalogue. */
   | 'reclassify-catalogue'
   /** Applies yearly tracking lifecycle logic to enforce the 15K pool limit */

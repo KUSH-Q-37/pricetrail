@@ -346,8 +346,10 @@ export class AmazonApiFetcher implements FetchStrategy {
     const mrpMinor = toMinor(prop<number>(prop(listing, 'SavingBasis'), 'Amount'));
 
     const manufacture = prop(info, 'ManufactureInfo');
+    const productInfo = prop(info, 'ProductInfo');
     const model = displayValue(prop(manufacture, 'Model'));
-    const colour = displayValue(prop(prop(info, 'ProductInfo'), 'Color'));
+    const colour = displayValue(prop(productInfo, 'Color'));
+    const releaseDate = displayValue(prop(productInfo, 'ReleaseDate'));
 
     const rawAttributes: Record<string, string> = {};
     for (const format of displayValues(prop(prop(info, 'TechnicalInfo'), 'Formats'))) {
@@ -355,6 +357,7 @@ export class AmazonApiFetcher implements FetchStrategy {
     }
     if (colour) rawAttributes['Colour'] = colour;
     if (model) rawAttributes['Item model number'] = model;
+    if (releaseDate) rawAttributes['Release Date'] = releaseDate;
 
     const externalIds = prop(info, 'ExternalIds');
 

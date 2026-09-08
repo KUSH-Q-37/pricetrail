@@ -153,6 +153,12 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   headers.set('Accept', 'application/json');
   if (body !== undefined) headers.set('Content-Type', 'application/json');
 
+  // API key authentication. The key is public to the browser (it is in the
+  // JS bundle), but it stops casual abuse and automated scanners. The real
+  // defence is CORS + rate limiting; this is the third layer.
+  const apiKey = process.env.NEXT_PUBLIC_API_KEY;
+  if (apiKey) headers.set('x-api-key', apiKey);
+
   // Generated here so a failure that never reaches the server still has an ID
   // the user can quote. The API validates and echoes it back.
   if (!headers.has('x-correlation-id') && typeof crypto !== 'undefined') {

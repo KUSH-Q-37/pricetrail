@@ -7,6 +7,7 @@ import {
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { SkipRateLimit } from '../../common/rate-limit/rate-limit.decorator';
+import { AppConfigService } from '../../config/app-config.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { RedisService } from '../../infra/redis/redis.service';
 import { isWorkerUnhealthy, workerStatus } from '../../infra/worker/worker-status';
@@ -65,6 +66,7 @@ export class HealthController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly config: AppConfigService,
   ) {}
 
   @Get('live')
@@ -94,11 +96,14 @@ export class HealthController {
     // question it asked, everything was fine. The product was silently not
     // doing the one thing it exists to do. A readiness check that cannot fail
     // for the most likely failure is decoration.
+    //
+    // In local development or staging, seeded observations can naturally be older
+    // than 26 hours without indicating a production outage.
     const healthy =
       database.status === 'up' &&
       redis.status === 'up' &&
       !isWorkerUnhealthy() &&
-      !observations.stale;
+      (!this.config.isProduction || !observations.stale);
 
     const report: ReadinessReport = {
       status: healthy ? 'ok' : 'degraded',

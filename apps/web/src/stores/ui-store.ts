@@ -8,7 +8,7 @@ export type ChartRange = '7D' | '1M' | '3M' | '6M' | '1Y' | '15M';
  * `label` is what the button shows; `spoken` is its accessible name.
  *
  * The two differ on purpose. A row of six buttons reading "7 Days / 1 Month /
- * 3 Months / 6 Months / 1 Year / 1Y 3M" is wide enough to wrap on a phone and
+ * 3 Months / 6 Months / 1 Year / 15 Months" is wide enough to wrap on a phone and
  * mixes singular and plural for no gain — the abbreviations scan as a scale,
  * which is what a range selector is.
  *

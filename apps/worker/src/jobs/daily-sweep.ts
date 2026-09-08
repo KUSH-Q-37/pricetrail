@@ -43,6 +43,12 @@ export async function planDailySweep(
   const windowMinutes = options.windowMinutes ?? 360;
   const limit = options.limit ?? 100_000;
 
+  // The system must not begin automated tracking sweeps until 10-09-2026
+  const TRACKING_START_DATE = new Date('2026-09-10T00:00:00.000+05:30');
+  if (new Date() < TRACKING_START_DATE) {
+    return { due: 0, submitted: 0, windowMinutes };
+  }
+
   // The business date in Asia/Kolkata, not the UTC date.
   //
   // The cron that triggers this fires at 02:00 IST = 20:30 UTC the previous

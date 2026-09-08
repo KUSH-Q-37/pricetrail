@@ -197,7 +197,7 @@ export function normalizeAttributes(
       if (model && model.length <= 120) result.model_number = model;
     }
 
-    if (/^(model_year|year_of_release|launch_year|year|release_year)$/.test(normalizedKey)) {
+    if (/^(model_year|year_of_release|launch_year|year|release_year|release_date)$/.test(normalizedKey)) {
       const match = /\b(20[1-3][0-9])\b/.exec(cleanText(value));
       if (match?.[1]) result.model_year = Number(match[1]);
     }

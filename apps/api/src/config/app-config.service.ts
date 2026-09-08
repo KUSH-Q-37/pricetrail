@@ -82,4 +82,9 @@ export class AppConfigService {
       maxRequests: this.get('RATE_LIMIT_MAX_REQUESTS'),
     };
   }
+
+  /** Empty string means "no key required" (local dev). */
+  get apiSecretKey(): string {
+    return this.get('API_SECRET_KEY');
+  }
 }
