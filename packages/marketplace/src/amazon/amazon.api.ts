@@ -191,13 +191,31 @@ export class AmazonApiFetcher implements FetchStrategy {
     const durationMs = Date.now() - started;
     const outcomes = new Map<string, FetchOutcome>();
 
-    for (const item of itemsFrom(body, 'itemsResult')) {
+    const items = itemsFrom(body, 'itemsResult');
+    console.log(
+      `[AmazonAPI] Response keys: ${Object.keys(body as Record<string, unknown>).join(', ')}`,
+      `| items: ${items.length}`,
+    );
+
+    for (const item of items) {
       const asin = prop<string>(item, 'ASIN');
       if (!asin) continue;
 
-      const validated = validateFetchedProduct(this.toRawProduct(item, asin));
+      const raw = this.toRawProduct(item, asin);
+      const validated = validateFetchedProduct(raw);
       if (!validated.ok) {
         // One bad item must not discard the other nine in the batch.
+        console.error(
+          `[AmazonAPI] Product ${asin} failed validation:`,
+          JSON.stringify(validated.error),
+          '— raw:',
+          JSON.stringify({
+            title: raw.title,
+            priceMinor: raw.priceMinor,
+            currency: raw.currency,
+            brand: raw.brand,
+          }),
+        );
         continue;
       }
 
