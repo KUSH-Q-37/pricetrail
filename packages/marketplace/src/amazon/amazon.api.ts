@@ -207,7 +207,7 @@ export class AmazonApiFetcher implements FetchStrategy {
         // One bad item must not discard the other nine in the batch.
         console.error(
           `[AmazonAPI] Product ${asin} failed validation:`,
-          JSON.stringify(validated.error),
+          JSON.stringify(validated.issues),
           '— raw:',
           JSON.stringify({
             title: raw.title,
