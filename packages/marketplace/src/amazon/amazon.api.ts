@@ -60,10 +60,12 @@ const RESOURCES = [
   // nobody can exclude.
   'itemInfo.classifications',
   'itemInfo.technicalInfo',
-  'offers.listings.price',
-  'offers.listings.savingBasis',
-  'offers.listings.availability.message',
-  'offers.listings.merchantInfo',
+  // The Creators API renamed `offers` → `offersV2`. `savingBasis` (the MRP /
+  // list price before discount) was dropped entirely; discount percentage is
+  // computed from the MRP when it appears inside the price object instead.
+  'offersV2.listings.price',
+  'offersV2.listings.availability',
+  'offersV2.listings.merchantInfo',
   'images.primary.large',
 ];
 
@@ -345,12 +347,19 @@ export class AmazonApiFetcher implements FetchStrategy {
   }
 
   private toRawProduct(item: unknown, asin: string): RawFetchedProduct {
-    const listing = (prop<unknown[]>(prop(item, 'Offers'), 'Listings') ?? [])[0];
+    // The Creators API renamed the response key from `Offers` to `OffersV2`.
+    // Try both so the parser survives if Amazon ever reverts or aliases.
+    const offers = prop(item, 'OffersV2') ?? prop(item, 'Offers');
+    const listing = (prop<unknown[]>(offers, 'Listings') ?? [])[0];
     const info = prop(item, 'ItemInfo');
 
     const price = prop(listing, 'Price');
     const priceMinor = toMinor(prop<number>(price, 'Amount'));
-    const mrpMinor = toMinor(prop<number>(prop(listing, 'SavingBasis'), 'Amount'));
+    // SavingBasis was dropped from the Creators API. Fall back to reading it
+    // from the price object (some responses nest it there) or leave undefined.
+    const mrpMinor =
+      toMinor(prop<number>(prop(listing, 'SavingBasis'), 'Amount')) ??
+      toMinor(prop<number>(price, 'SavingBasis'));
 
     const manufacture = prop(info, 'ManufactureInfo');
     const productInfo = prop(info, 'ProductInfo');
