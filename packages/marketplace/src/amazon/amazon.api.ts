@@ -372,12 +372,18 @@ export class AmazonApiFetcher implements FetchStrategy {
     const info = prop(item, 'ItemInfo');
 
     const price = prop(listing, 'Price');
-    const priceMinor = toMinor(prop<number>(price, 'Amount'));
-    // SavingBasis was dropped from the Creators API. Fall back to reading it
-    // from the price object (some responses nest it there) or leave undefined.
+    // OffersV2 nests the amount under `price.money.amount` instead of the
+    // old PA-API `price.amount`. Try the new path first, fall back to old.
+    const money = prop(price, 'Money');
+    const priceMinor = toMinor(prop<number>(money, 'Amount'))
+      ?? toMinor(prop<number>(price, 'Amount'));
+    // savingBasis moved inside the price object: `price.savingBasis.money.amount`.
+    const savingBasis = prop(price, 'SavingBasis');
+    const savingMoney = prop(savingBasis, 'Money');
     const mrpMinor =
-      toMinor(prop<number>(prop(listing, 'SavingBasis'), 'Amount')) ??
-      toMinor(prop<number>(price, 'SavingBasis'));
+      toMinor(prop<number>(savingMoney, 'Amount')) ??
+      toMinor(prop<number>(savingBasis, 'Amount')) ??
+      toMinor(prop<number>(prop(listing, 'SavingBasis'), 'Amount'));
 
     const manufacture = prop(info, 'ManufactureInfo');
     const productInfo = prop(info, 'ProductInfo');
@@ -418,7 +424,7 @@ export class AmazonApiFetcher implements FetchStrategy {
       ean: firstDigits(displayValues(prop(externalIds, 'EANs')), 8, 14),
       upc: firstDigits(displayValues(prop(externalIds, 'UPCs')), 12, 12),
 
-      currency: prop<string>(price, 'Currency') ?? 'INR',
+      currency: prop<string>(money, 'Currency') ?? prop<string>(price, 'Currency') ?? 'INR',
       priceMinor,
       mrpMinor,
       discountPercent: computeDiscountPercent(priceMinor, mrpMinor),
