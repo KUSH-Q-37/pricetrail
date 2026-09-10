@@ -169,11 +169,18 @@ export class AmazonApiFetcher implements FetchStrategy {
     );
 
     if (!response.ok) {
+      // Log the full error body so deployment failures are diagnosable from
+      // the Render logs without guesswork.
+      const errorBody = await response.text().catch(() => '');
+      console.error(
+        `[AmazonAPI] Catalog request failed: HTTP ${response.status} — ${errorBody.slice(0, 500)}`,
+      );
+
       // 429 means the quota is spent for now. Surfaced distinctly so the
       // adapter can fall back to scraping instead of failing the job.
       throw new FetchError(
         response.status === 429 ? 'QUOTA_EXHAUSTED' : 'API_ERROR',
-        `Creators API HTTP ${response.status}`,
+        `Creators API HTTP ${response.status}: ${errorBody.slice(0, 200)}`,
         { httpStatus: response.status },
       );
     }

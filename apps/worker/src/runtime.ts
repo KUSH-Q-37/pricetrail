@@ -612,7 +612,7 @@ export async function startWorkerRuntime(
         { pattern: '55 7,13,19 * * *', jobId: 'repeat-discover-catalogue' },
       );
 
-      // Amazon Creators API discovery. Offset by 10 minutes from Flipkart to avoid concurrency spikes.
+      // Amazon Creators API discovery. Offset by 10 minutes before Flipkart to avoid concurrency spikes.
       await producer.schedule(
         QUEUE.maintenance,
         { task: 'discover-amazon-catalogue' },
