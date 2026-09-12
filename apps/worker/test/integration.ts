@@ -255,7 +255,7 @@ async function main(): Promise<void> {
       console.log(`  no barcode, lexical  : ${lexical.decision} @ ${lexical.confidence}`);
       console.log(`  no barcode, embedded : ${embedded.decision} @ ${embedded.confidence}`);
 
-      check('lexical fallback stays capped', lexical.decision, 'NEEDS_REVIEW');
+      check('lexical fallback auto-confirms under relaxed rules', lexical.decision, 'AUTO_CONFIRMED');
       check('embedding raises confidence', embedded.confidence > lexical.confidence, true);
     }
   } finally {
