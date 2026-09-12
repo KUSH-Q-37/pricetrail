@@ -448,7 +448,7 @@ export async function startWorkerRuntime(
             // fetch bill grows monotonically with every URL anyone has ever
             // pasted, until the sweep cannot finish inside its window.
             const result = await retireStaleTracking(prisma, {
-              afterMonths: Number(process.env['TRACKING_RETIRE_AFTER_MONTHS'] ?? 12),
+              afterMonths: Number(process.env['TRACKING_RETIRE_AFTER_MONTHS'] ?? 24),
             });
 
             if (result.retired > 0 || result.skipped) {

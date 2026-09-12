@@ -20,7 +20,7 @@ import {
 import { evaluateProductLifecycle } from './lifecycle-manager';
 
 /** Consecutive failures after which a listing stops being fetched. */
-export const FAILURE_PAUSE_THRESHOLD = 5;
+export const FAILURE_PAUSE_THRESHOLD = 15;
 
 export interface ScrapeResult {
   status: 'SUCCEEDED' | 'FAILED';

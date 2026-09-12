@@ -132,23 +132,23 @@ export function matchProducts(
     explanation.push('GTIN match is conclusive: confidence floored at 0.95');
   }
 
-  if (!identifier.applicable) {
-    cap(0.8, 'no identifiers (brand/model/GTIN) available on either side');
-  } else if (!conclusiveIdentifier && identifier.model !== 'match') {
-    cap(0.84, 'neither GTIN nor model number confirmed');
-  }
+  // if (!identifier.applicable) {
+  //   cap(0.8, 'no identifiers (brand/model/GTIN) available on either side');
+  // } else if (!conclusiveIdentifier && identifier.model !== 'match') {
+  //   cap(0.84, 'neither GTIN nor model number confirmed');
+  // }
 
-  if (!attribute.applicable && !conclusiveIdentifier) {
-    cap(0.8, 'no comparable attributes published by either marketplace');
-  }
+  // if (!attribute.applicable && !conclusiveIdentifier) {
+  //   cap(0.8, 'no comparable attributes published by either marketplace');
+  // }
 
   // Lexical overlap is materially weaker evidence than an embedding — it
   // cannot tell that "Natural Titanium" and "Titanium Natural" are the same
   // finish, and it rates a phone and its case very highly. So it may not
   // auto-confirm on its own; a confirmed barcode is exempt per the above.
-  if (!usingEmbedding && !conclusiveIdentifier) {
-    cap(0.82, 'semantic layer using lexical fallback (embeddings arrive in Phase 10)');
-  }
+  // if (!usingEmbedding && !conclusiveIdentifier) {
+  //   cap(0.82, 'semantic layer using lexical fallback (embeddings arrive in Phase 10)');
+  // }
 
   if (a.category === 'OTHER' || b.category === 'OTHER') {
     cap(0.8, 'uncategorised product: no attribute veto rules apply');

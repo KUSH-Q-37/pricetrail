@@ -84,6 +84,6 @@ export const WEIGHTS = {
 } as const;
 
 export const THRESHOLDS = {
-  autoConfirm: 0.85,
+  autoConfirm: 0.80,
   review: 0.6,
 } as const;
