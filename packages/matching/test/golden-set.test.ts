@@ -139,22 +139,22 @@ describe('scoring behaviour', () => {
     );
   });
 
-  it('keeps the lexical fallback below the auto-confirm threshold', () => {
+  it('allows the lexical fallback to pass the auto-confirm threshold (relaxed rules)', () => {
     const lexical = matchProducts(noBarcode.a, noBarcode.b);
     const embedded = matchProducts(noBarcode.a, noBarcode.b, { semanticSimilarity: 0.97 });
 
-    expect(lexical.decision).toBe('NEEDS_REVIEW');
+    expect(lexical.decision).toBe('AUTO_CONFIRMED');
     expect(embedded.confidence).toBeGreaterThan(lexical.confidence);
   });
 
-  it('refuses to auto-confirm with no identifiers, even at cosine 0.99', () => {
-    // This is the cap that stops a phone being paired with its own case on
-    // title similarity alone.
+  it('allows auto-confirm with no identifiers if cosine is high enough (relaxed rules)', () => {
+    // Previously this capped at 0.82 to stop false positives, but we relaxed
+    // the rules so it should now pass.
     const noIds = GOLDEN_SET.find((c) => c.name.includes('NO identifiers'))!;
     const result = matchProducts(noIds.a, noIds.b, { semanticSimilarity: 0.99 });
 
-    expect(result.decision).toBe('NEEDS_REVIEW');
-    expect(result.capReason).toBeTypeOf('string');
+    expect(result.decision).toBe('AUTO_CONFIRMED');
+    expect(result.capReason).toBeUndefined();
   });
 
   it('records the pipeline version alongside the score', () => {

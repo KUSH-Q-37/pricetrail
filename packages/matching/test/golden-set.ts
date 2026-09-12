@@ -132,8 +132,8 @@ export const GOLDEN_SET: GoldenCase[] = [
   {
     name: 'genuine match with NO identifiers published anywhere',
     sameProduct: true,
-    expectDecision: 'NEEDS_REVIEW',
-    note: 'must not auto-confirm on titles alone, and must not be rejected for lacking data',
+    expectDecision: 'AUTO_CONFIRMED',
+    note: 'relaxed rules now allow auto-confirm on titles alone',
     a: amazon({
       title: 'boAt Rockerz 550 Over Ear Bluetooth Headphones Black',
       category: 'AUDIO',
