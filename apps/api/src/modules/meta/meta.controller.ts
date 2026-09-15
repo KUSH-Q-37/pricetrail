@@ -1,5 +1,6 @@
 import { Controller, Get, NotFoundException, Param } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Queue, createRedisConnection, QUEUE } from '@pricetrail/queue';
 
 import { AppConfigService } from '../../config/app-config.service';
 import { SkipRateLimit } from '../../common/rate-limit/rate-limit.decorator';
@@ -55,8 +56,6 @@ export class MetaController {
   @SkipRateLimit()
   @ApiOperation({ summary: 'Wipe all Redis queues (Emergency)' })
   async wipeQueues(): Promise<{ message: string }> {
-    const { Queue } = require('bullmq');
-    const { createRedisConnection, QUEUE } = require('@pricetrail/queue');
     const redisUrl = process.env.REDIS_URL;
     if (!redisUrl) return { message: 'REDIS_URL not found' };
 
