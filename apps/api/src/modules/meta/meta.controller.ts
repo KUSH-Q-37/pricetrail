@@ -48,4 +48,26 @@ export class MetaController {
     }
     throw new Error('Deliberate unhandled error for envelope verification');
   }
+
+  /** Emergency endpoint to wipe Redis queues without Shell access */
+  @Get('wipe-queues')
+  @ApiOperation({ summary: 'Wipe all Redis queues (Emergency)' })
+  async wipeQueues(): Promise<{ message: string }> {
+    const { Queue } = require('bullmq');
+    const { createRedisConnection, QUEUE } = require('@pricetrail/queue');
+    const redisUrl = process.env.REDIS_URL;
+    if (!redisUrl) return { message: 'REDIS_URL not found' };
+
+    const connection = createRedisConnection(redisUrl);
+    for (const queueName of Object.values(QUEUE) as string[]) {
+      const q = new Queue(queueName, { connection });
+      try {
+        await q.drain(true);
+        await q.obliterate({ force: true });
+      } catch (e) {}
+      await q.close();
+    }
+    connection.disconnect();
+    return { message: 'All queues wiped successfully!' };
+  }
 }
