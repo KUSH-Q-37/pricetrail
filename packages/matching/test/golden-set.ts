@@ -101,11 +101,11 @@ export const GOLDEN_SET: GoldenCase[] = [
       priceMinor: 12999900,
     }),
     b: flipkart({
-      title: 'SAMSUNG 138 cm (55 inch) QLED Ultra HD (4K) Smart Tizen TV (Titanium Gray)',
+      title: 'SAMSUNG 138 cm (55 inch) QLED Ultra HD (4K) Smart Tizen TV (Titanium Grey)',
       brand: 'SAMSUNG',
       modelNumber: 'QA55Q60B',
       category: 'TELEVISION',
-      attributes: { screen_in: 55, resolution: '4k', colour: 'gray' },
+      attributes: { screen_in: 55, resolution: '4k', colour: 'grey' },
       priceMinor: 12899900,
     }),
   },

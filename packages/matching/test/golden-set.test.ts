@@ -7,22 +7,20 @@ import { GOLDEN_SET } from './golden-set';
 
 describe('category schemas', () => {
   it('vetoes capacity variants per category', () => {
-    expect(getVetoKeys('REFRIGERATOR')).toEqual(['capacity_l', 'star_rating']);
-    expect(getVetoKeys('WASHING_MACHINE')).toEqual(['capacity_kg', 'star_rating']);
+    expect(getVetoKeys('REFRIGERATOR')).toEqual(['capacity_l', 'star_rating', 'colour']);
+    expect(getVetoKeys('WASHING_MACHINE')).toEqual(['capacity_kg', 'star_rating', 'colour']);
   });
 
   it('vetoes screen size on televisions', () => {
     expect(getVetoKeys('TELEVISION')).toContain('screen_in');
   });
 
-  it('never vetoes colour', () => {
-    // Marketplaces name the same finish differently; vetoing here would
-    // discard a large share of genuine matches.
-    expect(getVetoKeys('AUDIO')).not.toContain('colour');
+  it('now vetoes colour', () => {
+    expect(getVetoKeys('AUDIO')).toContain('colour');
   });
 
-  it('has no attribute vetoes for an uncategorised product', () => {
-    expect(getVetoKeys('OTHER')).toEqual([]);
+  it('has colour attribute veto for an uncategorised product', () => {
+    expect(getVetoKeys('OTHER')).toEqual(['colour']);
   });
 });
 
