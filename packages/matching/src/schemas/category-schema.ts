@@ -44,33 +44,33 @@ export interface CategorySchema {
  */
 const SCHEMAS: Record<ProductCategory, AttributeDefinition[]> = {
   AUDIO: [
-    { key: 'colour', veto: false, weight: 0.5 },
+    { key: 'colour', veto: true, weight: 0.5 },
     { key: 'form_factor', veto: false, weight: 0.5 },
   ],
 
   TELEVISION: [
     { key: 'screen_in', veto: true, weight: 0.45, tolerance: 0.5 },
     { key: 'resolution', veto: true, weight: 0.35 },
-    { key: 'colour', veto: false, weight: 0.2 },
+    { key: 'colour', veto: true, weight: 0.2 },
   ],
 
   REFRIGERATOR: [
     // 260 L and 265 L are different SKUs at different prices.
     { key: 'capacity_l', veto: true, weight: 0.45, tolerance: 1 },
     { key: 'star_rating', veto: true, weight: 0.35 },
-    { key: 'colour', veto: false, weight: 0.2 },
+    { key: 'colour', veto: true, weight: 0.2 },
   ],
 
   WASHING_MACHINE: [
     { key: 'capacity_kg', veto: true, weight: 0.45, tolerance: 0.05 },
     { key: 'star_rating', veto: true, weight: 0.35 },
-    { key: 'colour', veto: false, weight: 0.2 },
+    { key: 'colour', veto: true, weight: 0.2 },
   ],
 
   AIR_CONDITIONER: [
     { key: 'capacity_ton', veto: true, weight: 0.45, tolerance: 0.01 },
     { key: 'star_rating', veto: true, weight: 0.35 },
-    { key: 'colour', veto: false, weight: 0.2 },
+    { key: 'colour', veto: true, weight: 0.2 },
   ],
 
   /**
@@ -78,7 +78,7 @@ const SCHEMAS: Record<ProductCategory, AttributeDefinition[]> = {
    * confidence below auto-confirm — an uncategorised product cannot be
    * confidently matched on attributes we have no rules for.
    */
-  OTHER: [{ key: 'colour', veto: false, weight: 1 }],
+  OTHER: [{ key: 'colour', veto: true, weight: 1 }],
 };
 
 export function getCategorySchema(category: ProductCategory): CategorySchema {

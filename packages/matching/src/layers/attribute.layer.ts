@@ -109,7 +109,16 @@ function compareValues(
   // Free-text values (colour, form factor) are named inconsistently across
   // marketplaces, so containment counts as agreement: "natural titanium" and
   // "titanium" describe the same finish.
-  if (leftText.includes(rightText) || rightText.includes(leftText)) return 'match';
+  if (leftText.includes(rightText) || rightText.includes(leftText)) {
+    // Strict colour rule: If one side lists multiple colors (e.g. "White, Black" or "White/Black") 
+    // and the other side is a single color (e.g. "White"), reject the match.
+    if (definition.key === 'colour') {
+      const leftIsMulti = /[,\/]| and /.test(leftText);
+      const rightIsMulti = /[,\/]| and /.test(rightText);
+      if (leftIsMulti !== rightIsMulti) return 'mismatch';
+    }
+    return 'match';
+  }
 
   return 'mismatch';
 }
