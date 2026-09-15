@@ -2,6 +2,7 @@ import { Controller, Get, NotFoundException, Param } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { AppConfigService } from '../../config/app-config.service';
+import { SkipRateLimit } from '../../common/rate-limit/rate-limit.decorator';
 
 /**
  * Service metadata for clients.
@@ -51,6 +52,7 @@ export class MetaController {
 
   /** Emergency endpoint to wipe Redis queues without Shell access */
   @Get('wipe-queues')
+  @SkipRateLimit()
   @ApiOperation({ summary: 'Wipe all Redis queues (Emergency)' })
   async wipeQueues(): Promise<{ message: string }> {
     const { Queue } = require('bullmq');
